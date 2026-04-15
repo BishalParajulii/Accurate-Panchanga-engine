@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panchanga</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .date-input {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .date-input input {
+            padding: 8px;
+            font-size: 16px;
+        }
+        .date-input button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .panchanga {
+            margin-top: 20px;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            border-bottom: 2px solid #333;
+            padding-bottom: 5px;
+        }
+        .item {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .time {
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕉 Panchanga</h1>
+        <div class="date-input">
+            <input type="date" id="dateInput" value="2026-04-15">
+            <button onclick="loadPanchanga()">Load Panchanga</button>
+        </div>
+        <div id="panchanga" class="panchanga">
+            <!-- Panchanga data will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        async function loadPanchanga() {
+            const date = document.getElementById('dateInput').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            try {
+                const response = await fetch(`/panchanga/${date}`);
+                const data = await response.json();
+                displayPanchanga(data);
+            } catch (error) {
+                console.error('Error loading Panchanga:', error);
+                document.getElementById('panchanga').innerHTML = '<p>Error loading data</p>';
+            }
+        }
+
+        function displayPanchanga(data) {
+            let html = `
+                <div class="section">
+                    <h2>${data.date} - ${data.nepali_month}</h2>
+                    <p><strong>Location:</strong> ${data.location.lat}°N ${data.location.lon}°E | Elevation: ${data.location.elevation}m</p>
+                    <p><strong>Sunrise:</strong> ${data.sunrise} | <strong>Sunset:</strong> ${data.sunset}</p>
+                </div>
+            `;
+
+            html += '<div class="section"><h2>📅 Tithi</h2>';
+            data.tithis.forEach(t => {
+                const continueNote = t.continued ? ' <strong>(continues from previous day)</strong>' : '';
+                html += `<div class="item">${data.nepali_month} ${t.paksha} ${t.name} (${t.name_ne})${continueNote}<br><span class="time">${t.start} → ${t.end}</span></div>`;
+            });
+            html += '</div>';
+
+            html += '<div class="section"><h2>🌙 Nakshatra</h2>';
+            data.nakshatras.forEach(n => {
+                html += `<div class="item">${n.name}<br><span class="time">${n.start} → ${n.end}</span></div>`;
+            });
+            html += '</div>';
+
+            html += '<div class="section"><h2>☀ Yoga</h2>';
+            data.yogas.forEach(y => {
+                html += `<div class="item">${y.name}<br><span class="time">${y.start} → ${y.end}</span></div>`;
+            });
+            html += '</div>';
+
+            html += '<div class="section"><h2>🔮 Karana</h2>';
+            data.karanas.forEach(k => {
+                html += `<div class="item">${k.name} (${k.name_ne})<br><span class="time">${k.start} → ${k.end}</span></div>`;
+            });
+            html += '</div>';
+
+            document.getElementById('panchanga').innerHTML = html;
+        }
+
+        // Load default date on page load
+        window.onload = loadPanchanga;
+    </script>
+</body>
+</html>
