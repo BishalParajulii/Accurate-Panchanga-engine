@@ -67,6 +67,91 @@ GREG_TO_NEP_MONTH = {
     9: "Ashwin", 10: "Kartik", 11: "Mangsir", 12: "Poush"
 }
 
+NEPALI_MONTHS = {
+    "Poush": 1, "Magh": 2, "Falgun": 3, "Chaitra": 4,
+    "Baisakh": 5, "Jestha": 6, "Ashadha": 7, "Shrawan": 8,
+    "Bhadra": 9, "Ashwin": 10, "Kartik": 11, "Mangsir": 12
+}
+
+NEPALI_MONTH_NAMES = {
+    1: "Poush", 2: "Magh", 3: "Falgun", 4: "Chaitra",
+    5: "Baisakh", 6: "Jestha", 7: "Ashadha", 8: "Shrawan",
+    9: "Bhadra", 10: "Ashwin", 11: "Kartik", 12: "Mangsir"
+}
+
+NEPALI_MONTH_NAMES_NE = {
+    1: "पुष", 2: "माघ", 3: "फागुन", 4: "चैत",
+    5: "वैशाख", 6: "जेठ", 7: "असार", 8: "साउन",
+    9: "भदौ", 10: "असोज", 11: "कात्तिक", 12: "मंसिर"
+}
+
+GREG_MONTH_NAMES = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+]
+
+NEPALI_MONTH_DAYS = {
+    2082: [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 31],
+    2083: [31, 31, 32, 32, 31, 31, 29, 30, 29, 30, 30, 31],
+}
+
+def gregorian_to_nepali(greg_date):
+    """
+    Accurate Nepali date conversion from Gregorian.
+    Uses accurate month boundary dates for proper conversion.
+    Nepali year increments on Chaitra 1 (around April 13-14)
+    """
+    g_year = greg_date.year
+    g_month = greg_date.month
+    g_day = greg_date.day
+    
+    # Determine Nepali year (changes on Baisakh 1, around April 13-14)
+    # Corrected for 2083 transition: April 14, 2026
+    if (g_month < 4) or (g_month == 4 and g_day < 14):
+        n_year = g_year + 57 - 1
+    else:
+        n_year = g_year + 57
+    
+    # Month boundaries: (gregorian_month, start_day, nepali_month_number)
+    # These are the exact start dates of each Nepali month in Gregorian calendar
+    boundaries = [
+        (4, 14, 5),   # Baisakh starts Apr 14
+        (5, 15, 6),   # Jestha starts May 15
+        (6, 16, 7),   # Ashadha starts Jun 16
+        (7, 17, 8),   # Shrawan starts Jul 17
+        (8, 17, 9),   # Bhadra starts Aug 17
+        (9, 17, 10),  # Ashwin starts Sep 17
+        (10, 18, 11), # Kartik starts Oct 18
+        (11, 17, 12), # Mangsir starts Nov 17
+        (12, 16, 1),  # Poush starts Dec 16
+        (1, 15, 2),   # Magh starts Jan 15
+        (2, 13, 3),   # Falgun starts Feb 13
+        (3, 15, 4),   # Chaitra starts Mar 15
+    ]
+    
+    # Find current Nepali month by finding the most recent boundary
+    n_month = 4  # Default to Chaitra
+    boundary_month, boundary_day = 3, 16
+    
+    for b_month, b_day, nep_month in boundaries:
+        if g_month > b_month or (g_month == b_month and g_day >= b_day):
+            n_month = nep_month
+            boundary_month = b_month
+            boundary_day = b_day
+    
+    # Calculate day within month using datetime subtraction
+    if boundary_month > g_month:
+        # Start date was in previous year
+        start_year = g_year - 1
+    else:
+        start_year = g_year
+    
+    start_dt = datetime(start_year, boundary_month, boundary_day)
+    current_dt = datetime(g_year, g_month, g_day)
+    n_day = (current_dt - start_dt).days + 1
+    
+    return n_year, n_month, n_day
+
 
 def get_observer(lat, lon, elevation=0):
     obs = ephem.Observer()
@@ -189,6 +274,136 @@ def format_transitions(raw, tz, day_start_local, day_start_utc=None, prev_day_va
         }
         out.append(entry)
     return out
+
+
+def get_nepali_calendar_month(nep_year, nep_month, lat=27.7172, lon=85.3240, elevation=1400, tz_name="Asia/Kathmandu"):
+    """Get calendar data for a specific Nepali month"""
+    if nep_year not in NEPALI_MONTH_DAYS:
+        # Fallback to a default number of days or raise error
+        month_days = 30
+    else:
+        month_days = NEPALI_MONTH_DAYS[nep_year][nep_month - 1]
+    
+    # Calculate starting Gregorian date
+    boundaries = [
+        (4, 14, 5), (5, 15, 6), (6, 16, 7), (7, 17, 8),
+        (8, 17, 9), (9, 17, 10), (10, 18, 11), (11, 17, 12),
+        (12, 16, 1), (1, 15, 2), (2, 13, 3), (3, 15, 4)
+    ]
+    
+    b_month, b_day = 4, 14
+    for bm, bd, nm in boundaries:
+        if nm == nep_month:
+            b_month, b_day = bm, bd
+            break
+            
+    if nep_month < 5 and nep_month != 1:
+        g_year = nep_year - 57 + 1
+    else:
+        g_year = nep_year - 57
+        
+    start_date = datetime(g_year, b_month, b_day)
+    
+    # First day weekday (0=Monday, 6=Sunday)
+    first_day_weekday = start_date.weekday()
+    # Adjust to 0=Sunday for calendar grid
+    first_day_grid = (first_day_weekday + 1) % 7
+    
+    weeks = []
+    current_week = [None] * first_day_grid
+    
+    spanning_greg_months = set()
+    
+    for day in range(1, month_days + 1):
+        greg_date = start_date + timedelta(days=day - 1)
+        date_str = greg_date.strftime("%Y-%m-%d")
+        spanning_greg_months.add(greg_date.month)
+        
+        try:
+            panchanga = calculate_panchanga(date_str, lat, lon, elevation, tz_name)
+            primary_tithi = panchanga["tithis"][0] if panchanga["tithis"] else {}
+            
+            day_data = {
+                "greg_date": date_str,
+                "greg_day": greg_date.day,
+                "greg_month_name": GREG_MONTH_NAMES[greg_date.month],
+                "nep_date": f"{nep_year}-{nep_month}-{day}",
+                "nep_day": day,
+                "tithi": primary_tithi.get("name", ""),
+                "tithi_ne": primary_tithi.get("name_ne", ""),
+                "paksha": primary_tithi.get("paksha", ""),
+                "paksha_ne": primary_tithi.get("paksha_ne", ""),
+                "panchanga": panchanga
+            }
+        except Exception as e:
+            day_data = {"nep_day": day, "error": str(e)}
+            
+        current_week.append(day_data)
+        if len(current_week) == 7:
+            weeks.append(current_week)
+            current_week = []
+            
+    if current_week:
+        current_week.extend([None] * (7 - len(current_week)))
+        weeks.append(current_week)
+        
+    # Sort spanning months and format names
+    sorted_months = sorted(list(spanning_greg_months))
+    greg_month_str = " / ".join([GREG_MONTH_NAMES[m] for m in sorted_months])
+    
+    return {
+        "nep_year": nep_year,
+        "nep_month": nep_month,
+        "nep_month_name": NEPALI_MONTH_NAMES[nep_month],
+        "nep_month_name_ne": NEPALI_MONTH_NAMES_NE[nep_month],
+        "greg_months_spanning": greg_month_str,
+        "weeks": weeks
+    }
+
+
+def get_calendar_month(year, month, lat=27.7172, lon=85.3240, elevation=1400, tz_name="Asia/Kathmandu"):
+    """Get calendar data for the entire month with tithi and panchanga info for each day"""
+    import calendar
+    
+    cal_matrix = calendar.monthcalendar(year, month)
+    calendar_data = {
+        "year": year,
+        "month": month,
+        "month_name": GREG_TO_NEP_MONTH.get(month, "Unknown"),
+        "weeks": []
+    }
+    
+    for week in cal_matrix:
+        week_data = []
+        for day in week:
+            if day == 0:
+                week_data.append(None)
+            else:
+                date_str = f"{year:04d}-{month:02d}-{day:02d}"
+                try:
+                    panchanga = calculate_panchanga(date_str, lat, lon, elevation, tz_name)
+                    nep_year, nep_month, nep_day = gregorian_to_nepali(datetime(year, month, day))
+                    
+                    primary_tithi = panchanga["tithis"][0] if panchanga["tithis"] else {}
+                    
+                    day_data = {
+                        "greg_date": date_str,
+                        "greg_day": day,
+                        "nep_date": f"{nep_year}-{nep_month}-{nep_day}",
+                        "nep_day": nep_day,
+                        "tithi": primary_tithi.get("name", ""),
+                        "tithi_ne": primary_tithi.get("name_ne", ""),
+                        "paksha": primary_tithi.get("paksha", ""),
+                        "paksha_ne": primary_tithi.get("paksha_ne", ""),
+                        "panchanga": panchanga
+                    }
+                    week_data.append(day_data)
+                except Exception as e:
+                    week_data.append({"greg_day": day, "error": str(e)})
+        
+        calendar_data["weeks"].append(week_data)
+    
+    return calendar_data
 
 
 def calculate_panchanga(date_str, lat=27.7172, lon=85.3240, elevation=1400, tz_name="Asia/Kathmandu"):
@@ -316,6 +531,24 @@ async def get_panchanga(date_str: str):
     try:
         p = calculate_panchanga(date_str)
         return p
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/calendar/{year}/{month}")
+async def get_calendar(year: int, month: int):
+    try:
+        cal_data = get_calendar_month(year, month)
+        return cal_data
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/nepali-calendar/{year}/{month}")
+async def get_nepali_calendar(year: int, month: int):
+    try:
+        cal_data = get_nepali_calendar_month(year, month)
+        return cal_data
     except Exception as e:
         return {"error": str(e)}
 

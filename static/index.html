@@ -3,131 +3,824 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panchanga</title>
+    <title>Nepali Panchanga Calendar</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
-            background-color: #f5f5f5;
         }
+
         .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 30px;
         }
-        h1 {
+
+        header {
             text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background-color: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background-color: #f0f0f0;
+            color: #333;
+            border: 2px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e0e0e0;
+            transform: translateY(-2px);
+        }
+
+        .month-header {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .month-header h2 {
+            flex: 1;
+            min-width: 200px;
+            font-size: 1.8em;
             color: #333;
         }
-        .date-input {
-            text-align: center;
-            margin-bottom: 20px;
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 30px;
         }
-        .date-input input {
-            padding: 8px;
-            font-size: 16px;
-        }
-        .date-input button {
-            padding: 8px 16px;
-            background-color: #4CAF50;
+
+        .weekday-header {
+            background-color: #667eea;
             color: white;
-            border: none;
+            padding: 15px;
+            text-align: center;
+            font-weight: 600;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .day-cell {
+            background-color: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 140px;
             cursor: pointer;
-            font-size: 16px;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
         }
-        .panchanga {
-            margin-top: 20px;
+
+        .day-cell:hover {
+            border-color: #667eea;
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
+            transform: translateY(-3px);
+            background-color: #fafbff;
         }
-        .section {
-            margin-bottom: 20px;
+
+        .day-cell.empty {
+            background-color: transparent;
+            border: none;
+            cursor: default;
         }
-        .section h2 {
-            border-bottom: 2px solid #333;
-            padding-bottom: 5px;
+
+        .day-cell.empty:hover {
+            border: none;
+            box-shadow: none;
+            transform: none;
         }
-        .item {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #f9f9f9;
+
+        /* Modern Date Selector */
+        .date-selector-container {
+            margin-bottom: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .year-selector-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .year-select, .month-select {
+            padding: 10px 20px;
+            font-size: 18px;
+            font-weight: 600;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            color: #333;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .year-select:hover, .month-select:hover {
+            border-color: #764ba2;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .day-number {
+            font-size: 8px;
+            color: #999;
+            text-align: right;
+            margin-bottom: 2px;
+        }
+
+        .nepali-date {
+            font-size: 42px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 8px;
+            line-height: 1;
+            text-align: center;
+        }
+
+        .date-tithi-row {
+            display: flex;
+            gap: 6px;
+            align-items: flex-start;
+            margin-bottom: 5px;
+            flex-wrap: wrap;
+        }
+
+        .english-date {
+            font-size: 14px;
+            color: #777;
+            font-weight: 500;
+            position: absolute;
+            bottom: 30px;
+            right: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 2px 4px;
             border-radius: 4px;
         }
-        .time {
+
+        .tithi-info {
+            font-size: 9px;
+            color: #555;
+            font-weight: 500;
+            flex: 0 0 auto;
+            display: none;
+        }
+
+        .tithi-nepali {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+            line-height: 1.2;
+            width: 100%;
+            text-align: right;
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+        }
+
+        .day-cell.saturday {
+            background-color: #ffe8e8;
+            border-color: #ffcccc;
+        }
+
+        .day-cell.saturday .nepali-date {
+            color: #d32f2f;
+        }
+
+        .day-cell.saturday .tithi-info {
+            color: #d32f2f;
+        }
+
+        .day-cell.saturday:hover {
+            background-color: #ffd6d6;
+            border-color: #ff9999;
+        }
+
+        .day-cell.today {
+            background-color: #e8f5e9;
+            border-color: #4caf50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .day-cell.today .nepali-date {
+            color: #2e7d32;
+        }
+
+        .day-cell.today:hover {
+            background-color: #c8e6c9;
+            border-color: #388e3c;
+        }
+
+        .patro-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .day-cell:hover .patro-indicator {
+            opacity: 1;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            color: #333;
+            font-size: 1.8em;
+        }
+
+        .close-btn {
+            font-size: 28px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .panchanga-section {
+            margin-bottom: 25px;
+        }
+
+        .panchanga-section h3 {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .panchanga-item {
+            background-color: #f8f9fa;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+
+        .panchanga-item .label {
+            font-weight: 600;
+            color: #333;
             font-size: 14px;
+        }
+
+        .panchanga-item .value {
             color: #666;
+            font-size: 13px;
+            margin-top: 3px;
+        }
+
+        .nepali-text {
+            color: #764ba2;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .time-range {
+            color: #999;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+        .location-info {
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .location-info p {
+            color: #333;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            background-color: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab-btn.active {
+            background-color: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .day-cell {
+                min-height: 120px;
+                padding: 8px;
+            }
+
+            .nepali-date {
+                font-size: 18px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 20% auto;
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🕉 Panchanga</h1>
-        <div class="date-input">
-            <input type="date" id="dateInput" value="2026-04-15">
-            <button onclick="loadPanchanga()">Load Panchanga</button>
+        <header>
+            <h1>🕉 Nepali Panchanga Calendar</h1>
+            <p style="color: #666; margin-top: 10px;">नेपाली पञ्चाङ्ग</p>
+        </header>
+
+        <div class="month-header">
+            <button class="btn btn-secondary" onclick="previousMonth()">← Previous</button>
+            <div id="monthInfo" style="text-align: center;">
+                <h2 id="monthDisplay"></h2>
+                <p id="englishSpanning" style="color: #666; font-size: 1.1em; margin-top: 5px; font-weight: 500;"></p>
+            </div>
+            <button class="btn btn-secondary" onclick="nextMonth()">Next →</button>
         </div>
-        <div id="panchanga" class="panchanga">
-            <!-- Panchanga data will be displayed here -->
+
+        <div class="date-selector-container">
+            <div class="year-selector-wrapper" style="gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-weight: 600; color: #555;">Year:</span>
+                    <select id="searchYear" class="year-select" onchange="searchCalendar()">
+                        <!-- Years will be populated by JS -->
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-weight: 600; color: #555;">Month:</span>
+                    <select id="searchMonth" class="month-select" onchange="searchCalendar()">
+                        <!-- Months will be populated by JS -->
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="calendar" id="calendar">
+            <!-- Calendar will be generated here -->
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" onclick="goToToday()">Today</button>
+            <button class="btn btn-primary" onclick="toggleViewMode()">📋 Panchanga View</button>
+        </div>
+    </div>
+
+    <!-- Modal for detailed Patro -->
+    <div id="patroModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📅 Exact Patro (पञ्चाङ्ग)</h2>
+                <span class="close-btn" onclick="closePatroModal()">&times;</span>
+            </div>
+
+            <div class="location-info" id="locationInfo"></div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('tithi')">Tithi</button>
+                <button class="tab-btn" onclick="switchTab('nakshatra')">Nakshatra</button>
+                <button class="tab-btn" onclick="switchTab('yoga')">Yoga</button>
+                <button class="tab-btn" onclick="switchTab('karana')">Karana</button>
+            </div>
+
+            <div id="tithi" class="tab-content active"></div>
+            <div id="nakshatra" class="tab-content"></div>
+            <div id="yoga" class="tab-content"></div>
+            <div id="karana" class="tab-content"></div>
         </div>
     </div>
 
     <script>
-        async function loadPanchanga() {
-            const date = document.getElementById('dateInput').value;
-            if (!date) {
-                alert('Please select a date');
-                return;
-            }
+        let currentYear, currentMonth;
+
+        async function loadCalendar() {
             try {
-                const response = await fetch(`/panchanga/${date}`);
+                const response = await fetch(`/nepali-calendar/${currentYear}/${currentMonth}`);
                 const data = await response.json();
-                displayPanchanga(data);
+                
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    return;
+                }
+
+                renderCalendar(data);
             } catch (error) {
-                console.error('Error loading Panchanga:', error);
-                document.getElementById('panchanga').innerHTML = '<p>Error loading data</p>';
+                console.error('Error loading calendar:', error);
             }
         }
 
-        function displayPanchanga(data) {
-            let html = `
-                <div class="section">
-                    <h2>${data.date} - ${data.nepali_month}</h2>
-                    <p><strong>Location:</strong> ${data.location.lat}°N ${data.location.lon}°E | Elevation: ${data.location.elevation}m</p>
-                    <p><strong>Sunrise:</strong> ${data.sunrise} | <strong>Sunset:</strong> ${data.sunset}</p>
-                </div>
+        function renderCalendar(data) {
+            const calendar = document.getElementById('calendar');
+            calendar.innerHTML = '';
+
+            // Update Global state if coming from popstate or search
+            currentYear = data.nep_year;
+            currentMonth = data.nep_month;
+
+            // Add weekday headers
+            const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            weekdays.forEach((day, index) => {
+                const header = document.createElement('div');
+                header.className = 'weekday-header';
+                if (index === 6) {
+                    header.style.backgroundColor = '#d32f2f';
+                }
+                header.textContent = day;
+                calendar.appendChild(header);
+            });
+
+            // Add day cells
+            data.weeks.forEach(week => {
+                week.forEach((day, dayIndex) => {
+                    const dayCell = document.createElement('div');
+                    const isSaturday = dayIndex === 6;
+                    
+                    if (!day) {
+                        dayCell.className = 'day-cell empty';
+                    } else if (day.error) {
+                        dayCell.className = 'day-cell' + (isSaturday ? ' saturday' : '');
+                        dayCell.innerHTML = `<div class="nepali-date">${day.nep_day}</div>`;
+                    } else {
+                        const today = new Date().toLocaleDateString('en-CA');
+                        const isToday = day.greg_date === today;
+                        
+                        dayCell.className = 'day-cell' + (isSaturday ? ' saturday' : '') + (isToday ? ' today' : '');
+                        dayCell.innerHTML = `
+                            <div class="nepali-date">${day.nep_day}</div>
+                            <div class="english-date">${day.greg_day}</div>
+                            <div class="tithi-nepali">${day.paksha_ne} ${day.tithi_ne}</div>
+                            <div class="patro-indicator">📍</div>
+                        `;
+                        dayCell.style.cursor = 'pointer';
+                        dayCell.onclick = () => showPatroModal(day);
+                    }
+                    
+                    calendar.appendChild(dayCell);
+                });
+            });
+
+            // Update month display
+            document.getElementById('monthDisplay').innerHTML = `${data.nep_month_name_ne} ${data.nep_year} <span style="font-size: 0.7em; color: #777;">(${data.nep_month_name})</span>`;
+            document.getElementById('englishSpanning').textContent = data.greg_months_spanning;
+            
+            // Update search inputs
+            populateYearSelector(data.nep_year);
+            populateMonthSelector(data.nep_month);
+        }
+
+        function populateMonthSelector(selectedMonth) {
+            const monthSelect = document.getElementById('searchMonth');
+            monthSelect.innerHTML = '';
+            
+            const months = [
+                { id: 5, nep: 'वैशाख', eng: 'Baisakh' },
+                { id: 6, nep: 'जेठ', eng: 'Jestha' },
+                { id: 7, nep: 'असार', eng: 'Ashadha' },
+                { id: 8, nep: 'साउन', eng: 'Shrawan' },
+                { id: 9, nep: 'भदौ', eng: 'Bhadra' },
+                { id: 10, nep: 'असोज', eng: 'Ashwin' },
+                { id: 11, nep: 'कात्तिक', eng: 'Kartik' },
+                { id: 12, nep: 'मंसिर', eng: 'Mangsir' },
+                { id: 1, nep: 'पुष', eng: 'Poush' },
+                { id: 2, nep: 'माघ', eng: 'Magh' },
+                { id: 3, nep: 'फागुन', eng: 'Falgun' },
+                { id: 4, nep: 'चैत', eng: 'Chaitra' }
+            ];
+
+            months.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.nep} (${m.eng})`;
+                if (m.id === selectedMonth) opt.selected = true;
+                monthSelect.appendChild(opt);
+            });
+        }
+
+        function populateYearSelector(selectedYear) {
+            const yearSelect = document.getElementById('searchYear');
+            yearSelect.innerHTML = '';
+            for (let y = 2080; y <= 2085; y++) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if (y === selectedYear) opt.selected = true;
+                yearSelect.appendChild(opt);
+            }
+        }
+
+        function searchCalendar() {
+            currentYear = parseInt(document.getElementById('searchYear').value);
+            currentMonth = parseInt(document.getElementById('searchMonth').value);
+            loadCalendar();
+        }
+
+        function showPatroModal(dayData) {
+            const modal = document.getElementById('patroModal');
+            const panchanga = dayData.panchanga;
+
+            // Set location info
+            const locInfo = document.getElementById('locationInfo');
+            const loc = panchanga.location;
+            locInfo.innerHTML = `
+                <p><strong>Date:</strong> ${dayData.greg_date} | Nepali: ${dayData.nep_date}</p>
+                <p><strong>Location:</strong> ${loc.lat}°N, ${loc.lon}°E | Elevation: ${loc.elevation}m</p>
+                <p><strong>Sunrise:</strong> ${panchanga.sunrise} | <strong>Sunset:</strong> ${panchanga.sunset}</p>
             `;
 
-            html += '<div class="section"><h2>📅 Tithi</h2>';
-            data.tithis.forEach(t => {
-                const continueNote = t.continued ? ' <strong>(continues from previous day)</strong>' : '';
-                html += `<div class="item">${data.nepali_month} ${t.paksha} ${t.name} (${t.name_ne})${continueNote}<br><span class="time">${t.start} → ${t.end}</span></div>`;
+            // Tithi tab
+            let tithiHTML = '';
+            panchanga.tithis.forEach(t => {
+                const continued = t.continued ? ' (continues from previous day)' : '';
+                tithiHTML += `
+                    <div class="panchanga-item">
+                        <div class="label">${panchanga.nepali_month} ${t.paksha} ${t.name} ${continued}</div>
+                        <div class="nepali-text">${t.paksha_ne} ${t.name_ne}</div>
+                        <div class="time-range">${t.start} → ${t.end}</div>
+                    </div>
+                `;
             });
-            html += '</div>';
+            document.getElementById('tithi').innerHTML = tithiHTML || '<p>No data</p>';
 
-            html += '<div class="section"><h2>🌙 Nakshatra</h2>';
-            data.nakshatras.forEach(n => {
-                html += `<div class="item">${n.name}<br><span class="time">${n.start} → ${n.end}</span></div>`;
+            // Nakshatra tab
+            let nakshatraHTML = '';
+            panchanga.nakshatras.forEach(n => {
+                nakshatraHTML += `
+                    <div class="panchanga-item">
+                        <div class="label">${n.name}</div>
+                        <div class="time-range">${n.start} → ${n.end}</div>
+                    </div>
+                `;
             });
-            html += '</div>';
+            document.getElementById('nakshatra').innerHTML = nakshatraHTML || '<p>No data</p>';
 
-            html += '<div class="section"><h2>☀ Yoga</h2>';
-            data.yogas.forEach(y => {
-                html += `<div class="item">${y.name}<br><span class="time">${y.start} → ${y.end}</span></div>`;
+            // Yoga tab
+            let yogaHTML = '';
+            panchanga.yogas.forEach(y => {
+                yogaHTML += `
+                    <div class="panchanga-item">
+                        <div class="label">${y.name}</div>
+                        <div class="time-range">${y.start} → ${y.end}</div>
+                    </div>
+                `;
             });
-            html += '</div>';
+            document.getElementById('yoga').innerHTML = yogaHTML || '<p>No data</p>';
 
-            html += '<div class="section"><h2>🔮 Karana</h2>';
-            data.karanas.forEach(k => {
-                html += `<div class="item">${k.name} (${k.name_ne})<br><span class="time">${k.start} → ${k.end}</span></div>`;
+            // Karana tab
+            let karanaHTML = '';
+            panchanga.karanas.forEach(k => {
+                karanaHTML += `
+                    <div class="panchanga-item">
+                        <div class="label">${k.name}</div>
+                        <div class="nepali-text">${k.name_ne || ''}</div>
+                        <div class="time-range">${k.start} → ${k.end}</div>
+                    </div>
+                `;
             });
-            html += '</div>';
+            document.getElementById('karana').innerHTML = karanaHTML || '<p>No data</p>';
 
-            document.getElementById('panchanga').innerHTML = html;
+            modal.style.display = 'block';
         }
 
-        // Load default date on page load
-        window.onload = loadPanchanga;
+        function closePatroModal() {
+            document.getElementById('patroModal').style.display = 'none';
+        }
+
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function previousMonth() {
+            currentMonth--;
+            if (currentMonth < 1) {
+                currentMonth = 12;
+            }
+            // Note: Year change logic for Nepali calendar
+            // Baisakh (5) is start of year. Chaitra (4) is end.
+            // But currently year is shared across months.
+            // Actually, year changes at Baisakh 1.
+            // If we are at Baisakh (5) and go back, we go to Chaitra (4) of previous year.
+            if (currentMonth === 4) {
+                // We just moved from Baisakh to Chaitra
+                currentYear--;
+            }
+            loadCalendar();
+        }
+
+        function nextMonth() {
+            currentMonth++;
+            if (currentMonth > 12) {
+                currentMonth = 1;
+            }
+            // If we move from Chaitra (4) to Baisakh (5)
+            if (currentMonth === 5) {
+                currentYear++;
+            }
+            loadCalendar();
+        }
+
+        function goToToday() {
+            // Get current BS date from server or calculate
+            const today = new Date();
+            // Simple conversion for now, or fetch from server
+            const gregYear = today.getFullYear();
+            const gregMonth = today.getMonth() + 1;
+            const gregDay = today.getDate();
+            
+            // Approximate BS year (updated to +57 logic)
+            if (gregMonth < 4 || (gregMonth === 4 && gregDay < 14)) {
+                currentYear = gregYear + 57 - 1;
+            } else {
+                currentYear = gregYear + 57;
+            }
+            
+            // Map Gregorian month to approximate Nepali month
+            const gregToNepApprox = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1];
+            currentMonth = gregToNepApprox[gregMonth];
+
+            loadCalendar();
+        }
+
+        function toggleViewMode() {
+            // This can be enhanced to show/hide different views
+            alert('Calendar view is optimized for Nepali calendar.\nClick on any date to see detailed Patro!');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('patroModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Initialize calendar on page load
+        window.onload = () => {
+            goToToday();
+        };
     </script>
 </body>
 </html>
