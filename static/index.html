@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nepali Panchanga Calendar</title>
     <style>
+        :root {
+            --bg-dark: #0f0f12;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --accent-gold: #d4af37;
+            --accent-orange: #ff8c00;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --border-color: rgba(212, 175, 55, 0.2);
+            --danger: #ff4d4d;
+            --success: #00ff88;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,469 +24,302 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
             min-height: 100vh;
-            padding: 20px;
+            padding: 2.5vw;
+            line-height: 1.6;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            padding: 30px;
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            padding: 2.5rem;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         header {
             text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 20px;
+            margin-bottom: 3rem;
+            position: relative;
         }
 
         h1 {
-            font-size: 2.5em;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 10px 20px;
-            font-size: 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-
-        .btn-primary {
-            background-color: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background-color: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-secondary {
-            background-color: #f0f0f0;
-            color: #333;
-            border: 2px solid #ddd;
-        }
-
-        .btn-secondary:hover {
-            background-color: #e0e0e0;
-            transform: translateY(-2px);
+            font-size: 3rem;
+            background: linear-gradient(to right, var(--accent-gold), #fff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
         }
 
         .month-header {
-            text-align: center;
-            margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
+            margin-bottom: 2rem;
+            background: rgba(255,255,255,0.03);
+            padding: 1rem;
+            border-radius: 12px;
         }
 
-        .month-header h2 {
-            flex: 1;
-            min-width: 200px;
-            font-size: 1.8em;
-            color: #333;
+        .btn {
+            padding: 12px 24px;
+            font-size: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 600;
+            background: transparent;
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+            color: #000;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3);
+            filter: brightness(1.1);
         }
 
         .calendar {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 8px;
-            margin-bottom: 30px;
+            gap: 12px;
+            margin-bottom: 3rem;
         }
 
         .weekday-header {
-            background-color: #667eea;
-            color: white;
-            padding: 15px;
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--accent-gold);
+            padding: 1rem;
             text-align: center;
-            font-weight: 600;
-            border-radius: 6px;
-            font-size: 14px;
+            font-weight: 700;
+            border-radius: 8px;
+            font-size: 0.9rem;
         }
 
         .day-cell {
-            background-color: #f8f9fa;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 12px;
-            min-height: 140px;
-            cursor: pointer;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 1rem;
+            min-height: 120px;
             transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
             position: relative;
+            overflow: hidden;
         }
 
-        .day-cell:hover {
-            border-color: #667eea;
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.25);
-            transform: translateY(-3px);
-            background-color: #fafbff;
-        }
-
-        .day-cell.empty {
-            background-color: transparent;
-            border: none;
-            cursor: default;
-        }
-
-        .day-cell.empty:hover {
-            border: none;
-            box-shadow: none;
-            transform: none;
-        }
-
-        /* Modern Date Selector */
-        .date-selector-container {
-            margin-bottom: 25px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        .year-selector-wrapper {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-
-        .year-select, .month-select {
-            padding: 10px 20px;
-            font-size: 18px;
-            font-weight: 600;
-            border: 2px solid #667eea;
-            border-radius: 8px;
-            color: #333;
-            cursor: pointer;
-            outline: none;
-            transition: all 0.3s ease;
-            background: white;
-        }
-
-        .year-select:hover, .month-select:hover {
-            border-color: #764ba2;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-        }
-
-        .day-number {
-            font-size: 8px;
-            color: #999;
-            text-align: right;
-            margin-bottom: 2px;
+        .day-cell:hover:not(.empty) {
+            background: rgba(255,255,255,0.07);
+            border-color: var(--accent-gold);
+            transform: scale(1.02);
+            z-index: 10;
         }
 
         .nepali-date {
-            font-size: 42px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 8px;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent-gold);
             line-height: 1;
-            text-align: center;
-        }
-
-        .date-tithi-row {
-            display: flex;
-            gap: 6px;
-            align-items: flex-start;
-            margin-bottom: 5px;
-            flex-wrap: wrap;
-        }
-
-        .english-date {
-            font-size: 14px;
-            color: #777;
-            font-weight: 500;
-            position: absolute;
-            bottom: 30px;
-            right: 12px;
-            background: rgba(255, 255, 255, 0.7);
-            padding: 2px 4px;
-            border-radius: 4px;
-        }
-
-        .tithi-info {
-            font-size: 9px;
-            color: #555;
-            font-weight: 500;
-            flex: 0 0 auto;
-            display: none;
         }
 
         .tithi-nepali {
-            font-size: 12px;
-            color: #667eea;
-            font-weight: 600;
-            line-height: 1.2;
-            width: 100%;
-            text-align: right;
-            position: absolute;
-            bottom: 12px;
-            right: 12px;
-        }
-
-        .day-cell.saturday {
-            background-color: #ffe8e8;
-            border-color: #ffcccc;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
         }
 
         .day-cell.saturday .nepali-date {
-            color: #d32f2f;
-        }
-
-        .day-cell.saturday .tithi-info {
-            color: #d32f2f;
-        }
-
-        .day-cell.saturday:hover {
-            background-color: #ffd6d6;
-            border-color: #ff9999;
+            color: var(--danger);
         }
 
         .day-cell.today {
-            background-color: #e8f5e9;
-            border-color: #4caf50;
-            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+            background: rgba(0, 255, 136, 0.05);
+            border-color: var(--success);
         }
 
-        .day-cell.today .nepali-date {
-            color: #2e7d32;
-        }
-
-        .day-cell.today:hover {
-            background-color: #c8e6c9;
-            border-color: #388e3c;
-        }
-
-        .patro-indicator {
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            width: 18px;
-            height: 18px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border-radius: 50%;
+        /* Kundali Section Premium Styles */
+        .gem-container {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .day-cell:hover .patro-indicator {
-            opacity: 1;
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.6);
-            animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 30px;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 85vh;
-            overflow-y: auto;
-            animation: slideIn 0.3s ease;
-            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateY(-50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-
-        .modal-header {
-            border-bottom: 3px solid #667eea;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h2 {
-            color: #333;
-            font-size: 1.8em;
-        }
-
-        .close-btn {
-            font-size: 28px;
-            font-weight: bold;
-            color: #999;
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-
-        .close-btn:hover {
-            color: #333;
-        }
-
-        .panchanga-section {
-            margin-bottom: 25px;
-        }
-
-        .panchanga-section h3 {
-            color: #667eea;
-            font-size: 1.2em;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #f0f0f0;
-        }
-
-        .panchanga-item {
-            background-color: #f8f9fa;
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-        }
-
-        .panchanga-item .label {
-            font-weight: 600;
-            color: #333;
-            font-size: 14px;
-        }
-
-        .panchanga-item .value {
-            color: #666;
-            font-size: 13px;
-            margin-top: 3px;
-        }
-
-        .nepali-text {
-            color: #764ba2;
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .time-range {
-            color: #999;
-            font-size: 12px;
-            font-style: italic;
-        }
-
-        .location-info {
-            background: linear-gradient(135deg, #667eea15, #764ba215);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-
-        .location-info p {
-            color: #333;
-            margin: 5px 0;
-            font-size: 14px;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 15px;
             flex-wrap: wrap;
+            margin-top: 1rem;
         }
 
-        .tab-btn {
+        .gem-badge {
             padding: 8px 16px;
-            background-color: #f0f0f0;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            border-radius: 20px;
+            font-size: 0.9rem;
             font-weight: 600;
+            background: rgba(212, 175, 55, 0.15);
+            border: 1px solid var(--accent-gold);
+            color: var(--accent-gold);
         }
 
-        .tab-btn.active {
-            background-color: #667eea;
-            color: white;
-            border-color: #667eea;
+        .gem-badge.unlucky {
+            background: rgba(255, 77, 77, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
         }
 
-        .tab-content {
+        .kundali-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-card h3 {
+            color: var(--accent-gold);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .dasha-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .dasha-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .dasha-table th {
+            text-align: left;
+            color: var(--accent-gold);
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dasha-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .current-dasha-row {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--accent-gold);
+            font-weight: 700;
+        }
+
+        input[type="date"], input[type="time"], input[type="number"] {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 12px;
+            border-radius: 8px;
+            width: 100%;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--accent-orange);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .tabs-header {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+
+        .tab-trigger {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+
+        .tab-trigger.active {
+            color: var(--accent-gold);
+            background: rgba(212, 175, 55, 0.1);
+        }
+
+        .tab-pane {
             display: none;
+            animation: fadeIn 0.5s ease;
         }
 
-        .tab-content.active {
+        .tab-pane.active {
             display: block;
         }
 
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-
-            h1 {
-                font-size: 1.8em;
-            }
-
-            .day-cell {
-                min-height: 120px;
-                padding: 8px;
-            }
-
-            .nepali-date {
-                font-size: 18px;
-            }
-
-            .modal-content {
-                width: 95%;
-                margin: 20% auto;
-                padding: 20px;
-            }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 12px;
+            overflow: hidden;
         }
+
+        .data-table th {
+            text-align: left;
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--accent-gold);
+            font-size: 0.95rem;
+        }
+
+        .data-table td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.05);
+            font-size: 0.9rem;
+        }
+
+        .chakra-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .chakra-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(212, 175, 55, 0.1);
+            padding: 1rem;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .chakra-label { color: var(--text-secondary); font-weight: 500; }
+        .chakra-value { color: var(--accent-gold); font-weight: 700; }
     </style>
 </head>
 <body>
@@ -517,6 +362,124 @@
         <div class="controls">
             <button class="btn btn-primary" onclick="goToToday()">Today</button>
             <button class="btn btn-primary" onclick="toggleViewMode()">📋 Panchanga View</button>
+            <button class="btn btn-primary" onclick="toggleKundaliSection()">🔮 Janma Kundali</button>
+        </div>
+
+        <!-- Kundali Section -->
+        <div id="kundaliSection" style="display: none; margin-top: 3rem;">
+            <div style="background: rgba(255,255,255,0.02); border-radius: 24px; padding: 2.5rem; border: 1px solid var(--border-color);">
+                <h2 style="color: var(--accent-gold); margin-bottom: 2rem; text-align: center; font-size: 2rem;">🔮 जनम कुण्डली (North Indian Style)</h2>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2.5rem;">
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Birth Date</label>
+                        <input type="date" id="birthDate">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Birth Time</label>
+                        <input type="time" id="birthTime">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Latitude</label>
+                        <input type="number" id="latitude" step="0.0001" value="27.7172">
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">Longitude</label>
+                        <input type="number" id="longitude" step="0.0001" value="85.3240">
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-bottom: 3rem;">
+                    <button class="btn btn-primary" onclick="generateKundali()" style="font-size: 1.2rem; padding: 1.2rem 3rem;">Generate Accurate Kundali</button>
+                </div>
+
+                <div id="kundaliResult" style="display: none;">
+                    <div class="tabs-header">
+                        <div class="tab-trigger active" onclick="switchKundaliTab('charts')">कुण्डली (Charts)</div>
+                        <div class="tab-trigger" onclick="switchKundaliTab('planets')">ग्रह स्थिति (Planets)</div>
+                        <div class="tab-trigger" onclick="switchKundaliTab('dasha')">दशा (Dasha)</div>
+                        <div class="tab-trigger" onclick="switchKundaliTab('chakra')">चक्र (Chakra)</div>
+                    </div>
+
+                    <!-- Charts Tab -->
+                    <div id="tab-charts" class="tab-pane active">
+                        <div class="kundali-grid">
+                            <div class="chart-card">
+                                <h3>जन्म कुण्डली (Janma Kundali)</h3>
+                                <div id="janmaChart"></div>
+                            </div>
+                            <div class="chart-card">
+                                <h3>नवमांश कुण्डली (Navamsha Kundali)</h3>
+                                <div id="navamshaChart"></div>
+                            </div>
+                        </div>
+                        <div class="chart-card" style="margin-top: 2rem;">
+                            <h4 style="color: var(--accent-gold); margin-bottom: 1rem; text-align: center;">शुभ र अशुभ रत्न</h4>
+                            <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 2rem;">
+                                <div>
+                                    <h5 style="color: var(--accent-gold); margin-bottom: 0.5rem;">शुभ (Lucky)</h5>
+                                    <div id="luckyGems" class="gem-container"></div>
+                                </div>
+                                <div>
+                                    <h5 style="color: var(--danger); margin-bottom: 0.5rem;">अशुभ (Avoid)</h5>
+                                    <div id="unluckyGems" class="gem-container"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Planets Tab -->
+                    <div id="tab-planets" class="tab-pane">
+                        <div class="chart-card">
+                            <h3 style="text-align: left;">🪐 विस्तृत ग्रह विवरण (Planetary Positions)</h3>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ग्रह (Planet)</th>
+                                            <th>राशि (Sign)</th>
+                                            <th>अंश (Degree)</th>
+                                            <th>नक्षत्र (Nakshatra)</th>
+                                            <th>पद (P)</th>
+                                            <th>भाव (H)</th>
+                                            <th>स्थिति (S)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="planetsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dasha Tab -->
+                    <div id="tab-dasha" class="tab-pane">
+                        <div class="dasha-card">
+                            <h3>⏰ विंशोत्तरी महादशा</h3>
+                            <div style="overflow-x: auto;">
+                                <table class="dasha-table">
+                                    <thead>
+                                        <tr>
+                                            <th>पति (Lord)</th>
+                                            <th>सुरु (Start)</th>
+                                            <th>अन्त्य (End)</th>
+                                            <th>स्थिती (Status)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashaBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chakra Tab (Avakahada) -->
+                    <div id="tab-chakra" class="tab-pane">
+                        <div class="chart-card">
+                            <h3>📜 अवकहडा चक्र (Avakahada Chakra)</h3>
+                            <div id="avakahadaChakra" class="chakra-grid"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -807,6 +770,108 @@
         function toggleViewMode() {
             // This can be enhanced to show/hide different views
             alert('Calendar view is optimized for Nepali calendar.\nClick on any date to see detailed Patro!');
+        }
+
+        function toggleKundaliSection() {
+            const section = document.getElementById('kundaliSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function switchKundaliTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-trigger').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function generateKundali() {
+            const birthDate = document.getElementById('birthDate').value;
+            const birthTime = document.getElementById('birthTime').value;
+            const latitude = document.getElementById('latitude').value;
+            const longitude = document.getElementById('longitude').value;
+
+            if (!birthDate || !birthTime) {
+                alert('Please fill birth date and time');
+                return;
+            }
+
+            try {
+                const response = await fetch('/kundali', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        birth_date: birthDate,
+                        birth_time: birthTime,
+                        latitude: parseFloat(latitude),
+                        longitude: parseFloat(longitude)
+                    })
+                });
+
+                const data = await response.json();
+                if (data.detail) throw new Error(data.detail);
+
+                document.getElementById('kundaliResult').style.display = 'block';
+                
+                // Charts
+                document.getElementById('janmaChart').innerHTML = `<img src="${data.janma_chart_url}?t=${Date.now()}" style="width: 100%; border-radius: 12px; border: 2px solid var(--accent-orange);">`;
+                document.getElementById('navamshaChart').innerHTML = `<img src="${data.navamsha_chart_url}?t=${Date.now()}" style="width: 100%; border-radius: 12px; border: 2px solid var(--accent-orange);">`;
+
+                // Gems
+                document.getElementById('luckyGems').innerHTML = data.kundali_data.gems.lucky_gems.map(g => `<span class="gem-badge">${g}</span>`).join('');
+                document.getElementById('unluckyGems').innerHTML = data.kundali_data.gems.unlucky_gems.map(g => `<span class="gem-badge unlucky">${g}</span>`).join('');
+
+                // Planets Table
+                const planetsBody = document.getElementById('planetsBody');
+                const planetMap = {
+                    'sun': 'सूर्य', 'moon': 'चन्द्र', 'mars': 'मंगल', 'mercury': 'बुध',
+                    'jupiter': 'गुरु', 'venus': 'शुक्र', 'saturn': 'शनि', 'rahu': 'राहु', 'ketu': 'केतु'
+                };
+                
+                planetsBody.innerHTML = Object.entries(data.kundali_data.planets).map(([key, p]) => `
+                    <tr>
+                        <td><strong>${planetMap[key]}</strong></td>
+                        <td>${p.raashi_name}</td>
+                        <td>${p.dms}</td>
+                        <td>${p.nakshatra_name}</td>
+                        <td>${p.pada}</td>
+                        <td>${data.kundali_data.planet_houses[key]}</td>
+                        <td>${p.is_vakri ? '<span style="color:var(--danger)">वक्री</span>' : 'मार्गी'}</td>
+                    </tr>
+                `).join('');
+
+                // Avakahada Chakra
+                const avakahadaGrid = document.getElementById('avakahadaChakra');
+                const avakahadaKeys = {
+                    'varna': 'वर्ण', 'vashya': 'वश्य', 'tithi': 'तिथि', 'nakshatra': 'नक्षत्र',
+                    'pada': 'पद', 'yoga': 'योग', 'karana': 'करण', 'gan': 'गण',
+                    'yoni': 'योनी', 'nadi': 'नाडी', 'sign': 'राशी'
+                };
+                avakahadaGrid.innerHTML = Object.entries(data.kundali_data.avakahada).map(([k, v]) => `
+                    <div class="chakra-item">
+                        <span class="chakra-label">${avakahadaKeys[k] || k}</span>
+                        <span class="chakra-value">${v}</span>
+                    </div>
+                `).join('');
+
+                // Dasha
+                const dashaBody = document.getElementById('dashaBody');
+                const currentDashaLord = data.kundali_data.current_dasha.current_mahadasha.lord;
+                dashaBody.innerHTML = data.kundali_data.current_dasha.all_mahadashas.map(d => `
+                    <tr class="${d.lord === currentDashaLord ? 'current-dasha-row' : ''}">
+                        <td>${d.lord_name} (${d.lord})</td>
+                        <td>${d.start_date.split('T')[0]}</td>
+                        <td>${d.end_date.split('T')[0]}</td>
+                        <td>${d.lord === currentDashaLord ? 'चलिरहेको' : 'आगामी'}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('kundaliResult').scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                alert('Error generating kundali: ' + error.message);
+                console.error(error);
+            }
         }
 
         // Close modal when clicking outside

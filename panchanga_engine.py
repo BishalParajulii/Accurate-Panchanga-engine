@@ -5,9 +5,13 @@ import math
 from datetime import datetime, timedelta
 from typing import Optional
 import pytz
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from kundali_calculator import calculate_kundali
+from kundali_chart import generate_kundali_chart, generate_kundali_text_report
+import os
 
 TITHI_NAMES = [
     "Pratipada", "Dwitiya", "Tritiya", "Chaturthi", "Panchami",
@@ -551,6 +555,60 @@ async def get_nepali_calendar(year: int, month: int):
         return cal_data
     except Exception as e:
         return {"error": str(e)}
+
+
+class KundaliRequest(BaseModel):
+    birth_date: str
+    birth_time: str
+    latitude: float = 27.7172
+    longitude: float = 85.3240
+    timezone: str = "Asia/Kathmandu"
+
+
+@app.post("/kundali")
+async def generate_kundali(request: KundaliRequest):
+    """Generate Janma Kundali"""
+    try:
+        # Parse birth datetime
+        birth_datetime = datetime.fromisoformat(f"{request.birth_date}T{request.birth_time}")
+
+        # Calculate kundali
+        kundali_data = calculate_kundali(
+            birth_datetime,
+            request.latitude,
+            request.longitude,
+            request.timezone,
+        )
+
+        # Generate charts
+        timestamp = request.birth_time.replace(':', '-')
+        janma_filename = f"kundali_janma_{request.birth_date}_{timestamp}.svg"
+        nav_filename = f"kundali_navamsha_{request.birth_date}_{timestamp}.svg"
+        
+        janma_path = os.path.join("static", janma_filename)
+        nav_path = os.path.join("static", nav_filename)
+        
+        generate_kundali_chart(kundali_data, janma_path, is_navamsha=False)
+        generate_kundali_chart(kundali_data, nav_path, is_navamsha=True)
+
+        return {
+            "kundali_data": kundali_data,
+            "janma_chart_url": f"/static/{janma_filename}",
+            "navamsha_chart_url": f"/static/{nav_filename}",
+        }
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/kundali-chart/{filename}")
+async def get_kundali_chart(filename: str):
+    """Serve kundali chart SVG"""
+    file_path = os.path.join("static", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="image/svg+xml")
+    return {"error": "Chart not found"}
 
 
 if __name__ == "__main__":
