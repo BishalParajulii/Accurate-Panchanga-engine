@@ -6,6 +6,11 @@ import pytz
 
 # Set ephemeris path (you may need to download ephemeris files)
 swe.set_ephe_path()
+# Use sidereal zodiac with Lahiri ayanamsa for Vedic-style kundali output
+swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+
+# Swiss Ephemeris flags for accurate, topocentric calculations
+SWE_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TOPOCTR
 
 # Planet constants
 PLANETS = {
@@ -16,8 +21,8 @@ PLANETS = {
     'jupiter': swe.JUPITER,
     'venus': swe.VENUS,
     'saturn': swe.SATURN,
-    'rahu': swe.MEAN_NODE,
-    'ketu': swe.MEAN_NODE,
+    'rahu': swe.TRUE_NODE,
+    'ketu': swe.TRUE_NODE,
 }
 
 PLANET_GEMS = {
@@ -74,20 +79,33 @@ def decimal_to_dms(decimal_deg):
     s = int((decimal_deg - d - m/60) * 3600)
     return f"{d:02d}° {m:02d}' {s:02d}\""
 
+def normalize_longitude(longitude: float) -> float:
+    return longitude % 360.0
+
+
 def julian_day_from_datetime(dt: datetime) -> float:
-    return swe.julday(dt.year, dt.month, dt.day, dt.hour + dt.minute/60.0 + dt.second/3600.0)
+    fraction = dt.hour + dt.minute / 60.0 + dt.second / 3600.0 + dt.microsecond / 3_600_000_000.0
+    return swe.julday(dt.year, dt.month, dt.day, fraction)
+
 
 def get_planet_position(jd: float, planet: int) -> Tuple[float, float, float]:
-    pos, ret = swe.calc_ut(jd, planet)
-    return pos[0], pos[1], pos[3]  # longitude, latitude, speed
+    pos, ret = swe.calc_ut(jd, planet, SWE_FLAGS)
+    return normalize_longitude(pos[0]), pos[1], pos[3]  # longitude, latitude, speed
+
+
+def get_true_node_position(jd: float) -> Tuple[float, float, float]:
+    pos, ret = swe.calc_ut(jd, swe.TRUE_NODE, SWE_FLAGS)
+    return normalize_longitude(pos[0]), pos[1], pos[3]
+
 
 def get_house_cusps(jd: float, lat: float, lon: float, hsys: str = 'P') -> List[float]:
     cusps, ascmc = swe.houses(jd, lat, lon, hsys.encode())
-    return list(cusps)
+    return [normalize_longitude(c) for c in cusps]
+
 
 def get_ascendant(jd: float, lat: float, lon: float) -> float:
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
-    return ascmc[0]
+    return normalize_longitude(ascmc[0])
 
 def longitude_to_raashi(longitude: float) -> Tuple[int, float]:
     raashi = int(longitude / 30) % 12
@@ -202,7 +220,9 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
         birth_datetime = tz.localize(birth_datetime)
     birth_utc = birth_datetime.astimezone(pytz.utc)
     jd = julian_day_from_datetime(birth_utc)
-    
+    swe.set_topo(lon, lat, 0)
+    ayanamsa = swe.get_ayanamsa_ut(jd)
+
     asc_deg = get_ascendant(jd, lat, lon)
     asc_raashi, asc_deg_in_raashi = longitude_to_raashi(asc_deg)
     house_cusps = get_house_cusps(jd, lat, lon)
@@ -210,13 +230,15 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
     planets = {}
     for name, p_id in PLANETS.items():
         if name == 'ketu':
-            r_lon, r_lat, r_speed = get_planet_position(jd, swe.MEAN_NODE)
-            lon_p = (r_lon + 180) % 360
-            lat_p = -r_lat
-            speed = r_speed
+            node_lon, node_lat, node_speed = get_true_node_position(jd)
+            lon_p = normalize_longitude(node_lon + 180.0)
+            lat_p = -node_lat
+            speed = node_speed
+        elif name == 'rahu':
+            lon_p, lat_p, speed = get_true_node_position(jd)
         else:
             lon_p, lat_p, speed = get_planet_position(jd, p_id)
-            
+
         r_idx, deg_in_r = longitude_to_raashi(lon_p)
         n_idx, pada = longitude_to_nakshatra(lon_p)
         
@@ -224,6 +246,7 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
             'longitude': lon_p,
             'raashi': r_idx,
             'raashi_name': RAASHI_NAMES[r_idx],
+            'raashi_name_en': RAASHI_NAMES_EN[r_idx],
             'degrees_in_raashi': deg_in_r,
             'dms': decimal_to_dms(deg_in_r),
             'nakshatra_name': NAKSHATRA_NAMES_NE[n_idx],
@@ -256,14 +279,29 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
     }
     
     gems = get_gem_recommendations(asc_raashi, planets)
-    dasha_data = calculate_vimshottari_dasha(longitude_to_nakshatra(planets['moon']['longitude'])[0], longitude_to_nakshatra(planets['moon']['longitude'])[1], birth_datetime, planets['moon']['longitude'] % (360/27))
+    moon_nakshatra_idx, moon_pada = longitude_to_nakshatra(planets['moon']['longitude'])
+    dasha_data = calculate_vimshottari_dasha(
+        moon_nakshatra_idx,
+        moon_pada,
+        birth_datetime,
+        planets['moon']['longitude'] % (360 / 27)
+    )
     avakahada = get_avakahada_chakra(planets, asc_deg, birth_datetime)
 
     return {
-        'birth_details': {'datetime': birth_datetime.isoformat(), 'latitude': lat, 'longitude': lon, 'timezone': tz_str},
+        'birth_details': {
+            'datetime': birth_datetime.isoformat(),
+            'latitude': lat,
+            'longitude': lon,
+            'timezone': tz_str,
+            'ayanamsa_degrees': ayanamsa,
+            'sidereal_mode': 'Lahiri'
+        },
         'ascendant': {
-            'raashi': asc_raashi, 'raashi_name': RAASHI_NAMES[asc_raashi], 
-            'degrees_in_raashi': asc_deg_in_raashi, 'dms': decimal_to_dms(asc_deg_in_raashi)
+            'raashi': asc_raashi,
+            'raashi_name': RAASHI_NAMES[asc_raashi], 
+            'degrees_in_raashi': asc_deg_in_raashi,
+            'dms': decimal_to_dms(asc_deg_in_raashi)
         },
         'planets': planets,
         'planet_houses': planet_houses,
