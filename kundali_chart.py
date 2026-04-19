@@ -9,117 +9,97 @@ PLANET_ABBR_NEPALI = {
     'rahu': 'रा', 'ketu': 'के'
 }
 
-# Hamro Patro style colors
+DEVANAGARI_DIGITS = {
+    '0': '०', '1': '१', '2': '२', '3': '३', '4': '४',
+    '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'
+}
+
+def to_devanagari(number: int) -> str:
+    return ''.join(DEVANAGARI_DIGITS[d] for d in str(number))
+
+# Kundali diagram style colors
 COLORS = {
-    'bg': '#000000',
-    'line': '#e67e22', # Bold Orange
+    'bg': '#111111',
+    'border': '#f39c12',
+    'line': '#f39c12',
     'text_planet': '#ffffff',
     'text_sign': '#ffffff',
-    'text_vakri': '#f1c40f' # Yellow for retrograde
+    'text_vakri': '#f39c12'
+}
+
+HOUSE_SIGN_POSITIONS = {
+    1: (250, 90), 2: (160, 80), 3: (90, 150), 4: (110, 245),
+    5: (90, 345), 6: (160, 455), 7: (250, 410), 8: (340, 455),
+    9: (430, 345), 10: (410, 245), 11: (430, 150), 12: (340, 80)
+}
+
+HOUSE_PLANET_POSITIONS = {
+    1: (250, 130), 2: (160, 105), 3: (90, 180), 4: (110, 280),
+    5: (90, 380), 6: (160, 470), 7: (250, 430), 8: (340, 470),
+    9: (430, 380), 10: (410, 280), 11: (430, 180), 12: (340, 105)
 }
 
 def generate_kundali_chart(data: Dict, output_path: str, is_navamsha: bool = False):
     """Generate North Indian Diamond Chart (Hamro Patro style)"""
-    dwg = svgwrite.Drawing(output_path, size=(500, 500), profile='full')
-    
-    # Background
+    dwg = svgwrite.Drawing(output_path, size=(520, 520), profile='full')
     dwg.add(dwg.rect(insert=(0, 0), size=('100%', '100%'), fill=COLORS['bg']))
-    
-    # Outer frame
-    dwg.add(dwg.rect(insert=(10, 10), size=(480, 480), fill='none', stroke=COLORS['line'], stroke_width=4))
-    
-    # Diamond lines
-    dwg.add(dwg.line(start=(10, 10), end=(490, 490), stroke=COLORS['line'], stroke_width=2))
-    dwg.add(dwg.line(start=(10, 490), end=(490, 10), stroke=COLORS['line'], stroke_width=2))
-    dwg.add(dwg.line(start=(10, 250), end=(250, 10), stroke=COLORS['line'], stroke_width=2))
-    dwg.add(dwg.line(start=(250, 10), end=(490, 250), stroke=COLORS['line'], stroke_width=2))
-    dwg.add(dwg.line(start=(490, 250), end=(250, 490), stroke=COLORS['line'], stroke_width=2))
-    dwg.add(dwg.line(start=(250, 490), end=(10, 250), stroke=COLORS['line'], stroke_width=2))
+    dwg.add(dwg.rect(insert=(10, 10), size=(500, 500), fill='none', stroke=COLORS['border'], stroke_width=5, rx=20, ry=20))
 
-    # Center coordinates for each house (North Indian style)
-    # 1st house is top-middle diamond
-    house_centers = [
-        (250, 125), (140, 60),  (60, 140), (125, 250),
-        (60, 360),  (140, 440), (250, 375), (360, 440),
-        (440, 360), (375, 250), (440, 140), (360, 60)
+    # Diamond grid
+    lines = [
+        ((10, 10), (510, 510)),
+        ((10, 510), (510, 10)),
+        ((10, 260), (260, 10)),
+        ((260, 10), (510, 260)),
+        ((510, 260), (260, 510)),
+        ((260, 510), (10, 260))
     ]
-    
-    # Sign positions (small numbers in each house)
-    sign_positions = [
-        (250, 230), (350, 130), (230, 25), (130, 130),
-        (25, 230),  (130, 350), (250, 470), (370, 350),
-        (475, 230), (370, 120), (250, 25), (130, 120) 
-    ]
-    # Actually, North Indian sign mapping is:
-    # 1st house (center top diamond) gets the lagna raashi number
-    
+    for start, end in lines:
+        dwg.add(dwg.line(start=start, end=end, stroke=COLORS['line'], stroke_width=3, stroke_linecap='round'))
+
     if is_navamsha:
         planets_data = data['navamsha']['planets']
         start_raashi = data['navamsha']['ascendant']['raashi'] + 1
     else:
         planets_data = data['planets']
         start_raashi = data['ascendant']['raashi'] + 1
-    
-    # House planet mapping
-    house_planets = {i+1: [] for i in range(12)}
+
+    house_planets = {i + 1: [] for i in range(12)}
     for p_name, p_info in planets_data.items():
         if is_navamsha:
-            # Navamsha house is different from Janma house
-            # We need to calculate it: (Nav_Planet_Raashi - Nav_Asc_Raashi + 1) % 12
             nav_p_r = p_info['raashi']
             nav_a_r = data['navamsha']['ascendant']['raashi']
             h = (nav_p_r - nav_a_r + 12) % 12 + 1
         else:
             h = data['planet_houses'][p_name]
-        
-        # Add labels with Nepali abbreviations
+
         label = PLANET_ABBR_NEPALI[p_name]
         if not is_navamsha and p_info.get('is_vakri'):
             label += '(व)'
         house_planets[h].append(label)
 
-    # Render Sign Numbers
-    for i in range(12):
-        sign_num = (start_raashi + i - 1) % 12 + 1
-        # Positions for sign numbers
-        sx, sy = 250, 250
-        if i == 0: sx, sy = 250, 230 # 1
-        elif i == 1: sx, sy = 180, 170 # 2
-        elif i == 2: sx, sy = 170, 110 # 3
-        elif i == 3: sx, sy = 120, 230 # 4
-        elif i == 4: sx, sy = 110, 330 # 5
-        elif i == 5: sx, sy = 170, 390 # 6
-        elif i == 6: sx, sy = 250, 270 # 7
-        elif i == 7: sx, sy = 330, 390 # 8
-        elif i == 8: sx, sy = 390, 330 # 9
-        elif i == 9: sx, sy = 380, 230 # 10
-        elif i == 10: sx, sy = 390, 110 # 11
-        elif i == 11: sx, sy = 330, 170 # 12
-        
-        dwg.add(dwg.text(str(sign_num), insert=(sx, sy), fill=COLORS['text_sign'], 
-                         font_size="20px", font_weight="bold", text_anchor="middle"))
+    # Title label for chart type
+    chart_label = 'नवमांश कुण्डली' if is_navamsha else 'जन्म कुण्डली'
+    dwg.add(dwg.text(chart_label, insert=(260, 45), fill=COLORS['text_planet'],
+                     font_size='24px', font_weight='700', text_anchor='middle'))
 
-    # Render Planets in each house
-    for h, p_list in house_planets.items():
-        cx, cy = 0, 0
-        if h == 1: cx, cy = 250, 120 # 1
-        elif h == 2: cx, cy = 180, 60 # 2
-        elif h == 3: cx, cy = 80, 60 # 3
-        elif h == 4: cx, cy = 120, 180 # 4
-        elif h == 5: cx, cy = 80, 280 # 5
-        elif h == 6: cx, cy = 180, 440 # 6
-        elif h == 7: cx, cy = 250, 380 # 7
-        elif h == 8: cx, cy = 340, 440 # 8
-        elif h == 9: cx, cy = 420, 350 # 9
-        elif h == 10: cx, cy = 350, 250 # 10
-        elif h == 11: cx, cy = 420, 150 # 11
-        elif h == 12: cx, cy = 340, 60 # 12
+    # Render sign numbers in each house
+    for house_number, (sx, sy) in HOUSE_SIGN_POSITIONS.items():
+        sign_num = (start_raashi + house_number - 1 - 1) % 12 + 1
+        dwg.add(dwg.text(to_devanagari(sign_num), insert=(sx, sy), fill=COLORS['text_sign'],
+                         font_size='20px', font_weight='bold', text_anchor='middle'))
 
-        # Group planets in the house
-        for idx, p_label in enumerate(p_list):
-            offset_y = idx * 22
-            dwg.add(dwg.text(p_label, insert=(cx, cy + offset_y), fill=COLORS['text_planet'], 
-                             font_size="22px", font_weight="600", text_anchor="middle"))
+    # Render planets
+    for h, labels in house_planets.items():
+        px, py = HOUSE_PLANET_POSITIONS[h]
+        for idx, p_label in enumerate(labels):
+            offset_y = idx * 24
+            dwg.add(dwg.text(p_label, insert=(px, py + offset_y), fill=COLORS['text_planet'],
+                             font_size='22px', font_weight='700', text_anchor='middle'))
+
+    # Watermark for version/debugging
+    dwg.add(dwg.text('generated by app v2', insert=(500, 515), fill=COLORS['text_sign'],
+                     font_size='10px', font_weight='normal', text_anchor='end', opacity=0.5))
 
     dwg.save()
 
