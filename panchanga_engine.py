@@ -1,20 +1,17 @@
-import swisseph as swe
+
+
+import ephem
 import math
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List
+from typing import Optional
 import pytz
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from kundali_calculator import calculate_kundali, julian_day_from_datetime, normalize_longitude
-from kundali_chart import generate_kundali_chart
+from kundali_calculator import calculate_kundali
+from kundali_chart import generate_kundali_chart, generate_kundali_text_report
 import os
-
-# Set ephemeris path
-swe.set_ephe_path()
-swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
-SWE_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_SIDEREAL
 
 TITHI_NAMES = [
     "Pratipada", "Dwitiya", "Tritiya", "Chaturthi", "Panchami",
@@ -56,10 +53,34 @@ KARANA_NAMES_NEPALI = [
     "वणिज", "विष्टि", "शकुनि", "चतुष्पाद", "नाग", "किंस्तुघ्न"
 ]
 
+AUSPICIOUS_TITHIS_WITHIN_PAKSHA = [2, 3, 5, 7, 10, 11, 12, 13]
+AUSPICIOUS_NAKSHATRAS = [
+    "Rohini", "Mrigashira", "Hasta", "Chitra", "Swati",
+    "Anuradha", "Uttara Ashadha", "Uttara Phalguni",
+    "Uttara Bhadrapada", "Revati", "Pushya"
+]
+INAUSPICIOUS_YOGAS = [
+    "Vishkambha", "Atiganda", "Shula", "Ganda", "Vyaghata",
+    "Vajra", "Vyatipata", "Parigha", "Vaidhriti"
+]
+INAUSPICIOUS_KARANAS = ["Vishti"]
+
 GREG_TO_NEP_MONTH = {
     1: "Magh", 2: "Falgun", 3: "Chaitra", 4: "Baisakh",
     5: "Jestha", 6: "Ashadha", 7: "Shrawan", 8: "Bhadra",
     9: "Ashwin", 10: "Kartik", 11: "Mangsir", 12: "Poush"
+}
+
+NEPALI_MONTHS = {
+    "Poush": 1, "Magh": 2, "Falgun": 3, "Chaitra": 4,
+    "Baisakh": 5, "Jestha": 6, "Ashadha": 7, "Shrawan": 8,
+    "Bhadra": 9, "Ashwin": 10, "Kartik": 11, "Mangsir": 12
+}
+
+NEPALI_MONTH_NAMES = {
+    1: "Poush", 2: "Magh", 3: "Falgun", 4: "Chaitra",
+    5: "Baisakh", 6: "Jestha", 7: "Ashadha", 8: "Shrawan",
+    9: "Bhadra", 10: "Ashwin", 11: "Kartik", 12: "Mangsir"
 }
 
 NEPALI_MONTH_NAMES_NE = {
@@ -68,29 +89,53 @@ NEPALI_MONTH_NAMES_NE = {
     9: "भदौ", 10: "असोज", 11: "कात्तिक", 12: "मंसिर"
 }
 
+GREG_MONTH_NAMES = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+]
+
 NEPALI_MONTH_DAYS = {
     2082: [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 31],
     2083: [31, 31, 32, 32, 31, 31, 29, 30, 29, 30, 30, 31],
 }
 
 def gregorian_to_nepali(greg_date):
+    """
+    Accurate Nepali date conversion from Gregorian.
+    Uses accurate month boundary dates for proper conversion.
+    Nepali year increments on Chaitra 1 (around April 13-14)
+    """
     g_year = greg_date.year
     g_month = greg_date.month
     g_day = greg_date.day
     
+    # Determine Nepali year (changes on Baisakh 1, around April 13-14)
+    # Corrected for 2083 transition: April 14, 2026
     if (g_month < 4) or (g_month == 4 and g_day < 14):
         n_year = g_year + 57 - 1
     else:
         n_year = g_year + 57
     
+    # Month boundaries: (gregorian_month, start_day, nepali_month_number)
+    # These are the exact start dates of each Nepali month in Gregorian calendar
     boundaries = [
-        (4, 14, 5), (5, 15, 6), (6, 16, 7), (7, 17, 8),
-        (8, 17, 9), (9, 17, 10), (10, 18, 11), (11, 17, 12),
-        (12, 16, 1), (1, 15, 2), (2, 13, 3), (3, 15, 4),
+        (4, 14, 5),   # Baisakh starts Apr 14
+        (5, 15, 6),   # Jestha starts May 15
+        (6, 16, 7),   # Ashadha starts Jun 16
+        (7, 17, 8),   # Shrawan starts Jul 17
+        (8, 17, 9),   # Bhadra starts Aug 17
+        (9, 17, 10),  # Ashwin starts Sep 17
+        (10, 18, 11), # Kartik starts Oct 18
+        (11, 17, 12), # Mangsir starts Nov 17
+        (12, 16, 1),  # Poush starts Dec 16
+        (1, 15, 2),   # Magh starts Jan 15
+        (2, 13, 3),   # Falgun starts Feb 13
+        (3, 15, 4),   # Chaitra starts Mar 15
     ]
     
-    n_month = 4
-    boundary_month, boundary_day = 3, 15
+    # Find current Nepali month by finding the most recent boundary
+    n_month = 4  # Default to Chaitra
+    boundary_month, boundary_day = 3, 16
     
     for b_month, b_day, nep_month in boundaries:
         if g_month > b_month or (g_month == b_month and g_day >= b_day):
@@ -98,33 +143,59 @@ def gregorian_to_nepali(greg_date):
             boundary_month = b_month
             boundary_day = b_day
     
-    start_dt = datetime(g_year if boundary_month <= g_month else g_year - 1, boundary_month, boundary_day)
-    n_day = (datetime(g_year, g_month, g_day) - start_dt).days + 1
+    # Calculate day within month using datetime subtraction
+    if boundary_month > g_month:
+        # Start date was in previous year
+        start_year = g_year - 1
+    else:
+        start_year = g_year
+    
+    start_dt = datetime(start_year, boundary_month, boundary_day)
+    current_dt = datetime(g_year, g_month, g_day)
+    n_day = (current_dt - start_dt).days + 1
     
     return n_year, n_month, n_day
 
-def get_sidereal_longitudes(dt_utc):
-    jd = julian_day_from_datetime(dt_utc)
-    sun_pos, _ = swe.calc_ut(jd, swe.SUN, SWE_FLAGS)
-    moon_pos, _ = swe.calc_ut(jd, swe.MOON, SWE_FLAGS)
-    return normalize_longitude(sun_pos[0]), normalize_longitude(moon_pos[0])
 
-def get_tithi_info(moon_lon, sun_lon):
-    diff = normalize_longitude(moon_lon - sun_lon)
-    raw_idx = int(diff / 12)
-    num = raw_idx + 1
+def get_observer(lat, lon, elevation=0):
+    obs = ephem.Observer()
+    obs.lat = str(lat)
+    obs.lon = str(lon)
+    obs.elevation = elevation
+    # Calculate atmospheric pressure based on elevation using barometric formula
+    obs.pressure = 1013.25 * (1 - elevation / 44330) ** 5.255
+    obs.horizon = 0  # Horizon at sea level for astronomical calculations
+    return obs
+
+def get_longitudes(observer, dt_utc):
+    observer.date = dt_utc.strftime('%Y/%m/%d %H:%M:%S')
+    sun = ephem.Sun(observer)
+    moon = ephem.Moon(observer)
+    sun_lon = math.degrees(float(ephem.Ecliptic(sun, epoch=ephem.J2000).lon)) % 360
+    moon_lon = math.degrees(float(ephem.Ecliptic(moon, epoch=ephem.J2000).lon)) % 360
+    return sun_lon, moon_lon
+
+
+def tithi_raw(sun_lon, moon_lon):
+    return ((moon_lon - sun_lon) % 360) / 12.0
+
+
+def tithi_index(sun_lon, moon_lon):
+    return int(tithi_raw(sun_lon, moon_lon))
+
+
+def get_tithi_info(raw_idx):
+    num = raw_idx + 1  # 1..30
     if num <= 15:
         paksha_idx, within = 0, num
     else:
         paksha_idx, within = 1, num - 15
-    
     if within == 15:
         name = "Purnima" if paksha_idx == 0 else "Amavasya"
         name_ne = "पूर्णिमा" if paksha_idx == 0 else "औंसी"
     else:
         name = TITHI_NAMES[within - 1]
         name_ne = TITHI_NAMES_NEPALI[within - 1]
-        
     return {
         "number": num,
         "name": name,
@@ -134,42 +205,210 @@ def get_tithi_info(moon_lon, sun_lon):
         "within_paksha": within,
     }
 
-def binary_search_transition(dt_start, dt_end, value_fn, target_val, precision_s=10):
-    lo, hi = dt_start, dt_end
+
+def nakshatra_index(moon_lon):
+    return int(moon_lon / (360 / 27)) + 1
+
+
+def yoga_index(sun_lon, moon_lon):
+    return int(((sun_lon + moon_lon) % 360) / (360 / 27)) + 1
+
+
+def karana_index(t_raw):
+    half = int(t_raw * 2) % 60
+    if half == 0: return 10
+    if half == 57: return 7
+    if half == 58: return 8
+    if half == 59: return 9
+    return (half - 1) % 7
+
+
+def binary_search_transition(observer, lo, hi, lo_val, value_fn, precision_s=10):
     while (hi - lo).total_seconds() > precision_s:
         mid = lo + (hi - lo) / 2
-        if value_fn(mid) == target_val:
+        if value_fn(observer, mid) == lo_val:
             lo = mid
         else:
             hi = mid
     return hi
 
-def scan_day(ds_utc, de_utc, value_fn, info_fn, step_min=30):
+
+def scan_day(observer, day_start_utc, day_end_utc, value_fn, info_fn, step_min=15, precision_s=10):
     transitions = []
-    cur = ds_utc
-    prev_val = value_fn(cur)
-    segment_start = ds_utc
-    
-    while cur < de_utc:
-        nxt = min(cur + timedelta(minutes=step_min), de_utc)
-        nxt_val = value_fn(nxt)
+    cur = day_start_utc
+    prev_val = value_fn(observer, cur)
+    segment_start = day_start_utc
+
+    while cur < day_end_utc:
+        nxt = min(cur + timedelta(minutes=step_min), day_end_utc)
+        nxt_val = value_fn(observer, nxt)
         if nxt_val != prev_val:
-            exact = binary_search_transition(cur, nxt, value_fn, prev_val)
+            exact = binary_search_transition(observer, cur, nxt, prev_val, value_fn, precision_s)
             transitions.append({
+                "val": prev_val,
                 "info": info_fn(prev_val),
                 "start_utc": segment_start,
-                "end_utc": exact
+                "end_utc": exact,
             })
             prev_val = nxt_val
             segment_start = exact
         cur = nxt
-        
+
     transitions.append({
+        "val": prev_val,
         "info": info_fn(prev_val),
         "start_utc": segment_start,
-        "end_utc": None
+        "end_utc": None,
     })
     return transitions
+
+
+def format_transitions(raw, tz, day_start_local, day_start_utc=None, prev_day_val=None):
+    out = []
+    for i, t in enumerate(raw):
+        start_local = pytz.utc.localize(t["start_utc"]).astimezone(tz)
+        end_local = pytz.utc.localize(t["end_utc"]).astimezone(tz) if t["end_utc"] else None
+        continued = i == 0 and prev_day_val is not None and t["val"] == prev_day_val
+        entry = {
+            **t["info"],
+            "start": start_local.strftime("%H:%M:%S"),
+            "end": end_local.strftime("%H:%M:%S") if end_local else "→ next day",
+            "end_dt": end_local,
+            "continued": continued,
+        }
+        out.append(entry)
+    return out
+
+
+def get_nepali_calendar_month(nep_year, nep_month, lat=27.7172, lon=85.3240, elevation=1400, tz_name="Asia/Kathmandu"):
+    """Get calendar data for a specific Nepali month"""
+    if nep_year not in NEPALI_MONTH_DAYS:
+        # Fallback to a default number of days or raise error
+        month_days = 30
+    else:
+        month_days = NEPALI_MONTH_DAYS[nep_year][nep_month - 1]
+    
+    # Calculate starting Gregorian date
+    boundaries = [
+        (4, 14, 5), (5, 15, 6), (6, 16, 7), (7, 17, 8),
+        (8, 17, 9), (9, 17, 10), (10, 18, 11), (11, 17, 12),
+        (12, 16, 1), (1, 15, 2), (2, 13, 3), (3, 15, 4)
+    ]
+    
+    b_month, b_day = 4, 14
+    for bm, bd, nm in boundaries:
+        if nm == nep_month:
+            b_month, b_day = bm, bd
+            break
+            
+    if nep_month < 5 and nep_month != 1:
+        g_year = nep_year - 57 + 1
+    else:
+        g_year = nep_year - 57
+        
+    start_date = datetime(g_year, b_month, b_day)
+    
+    # First day weekday (0=Monday, 6=Sunday)
+    first_day_weekday = start_date.weekday()
+    # Adjust to 0=Sunday for calendar grid
+    first_day_grid = (first_day_weekday + 1) % 7
+    
+    weeks = []
+    current_week = [None] * first_day_grid
+    
+    spanning_greg_months = set()
+    
+    for day in range(1, month_days + 1):
+        greg_date = start_date + timedelta(days=day - 1)
+        date_str = greg_date.strftime("%Y-%m-%d")
+        spanning_greg_months.add(greg_date.month)
+        
+        try:
+            panchanga = calculate_panchanga(date_str, lat, lon, elevation, tz_name)
+            primary_tithi = panchanga["tithis"][0] if panchanga["tithis"] else {}
+            
+            day_data = {
+                "greg_date": date_str,
+                "greg_day": greg_date.day,
+                "greg_month_name": GREG_MONTH_NAMES[greg_date.month],
+                "nep_date": f"{nep_year}-{nep_month}-{day}",
+                "nep_day": day,
+                "tithi": primary_tithi.get("name", ""),
+                "tithi_ne": primary_tithi.get("name_ne", ""),
+                "paksha": primary_tithi.get("paksha", ""),
+                "paksha_ne": primary_tithi.get("paksha_ne", ""),
+                "panchanga": panchanga
+            }
+        except Exception as e:
+            day_data = {"nep_day": day, "error": str(e)}
+            
+        current_week.append(day_data)
+        if len(current_week) == 7:
+            weeks.append(current_week)
+            current_week = []
+            
+    if current_week:
+        current_week.extend([None] * (7 - len(current_week)))
+        weeks.append(current_week)
+        
+    # Sort spanning months and format names
+    sorted_months = sorted(list(spanning_greg_months))
+    greg_month_str = " / ".join([GREG_MONTH_NAMES[m] for m in sorted_months])
+    
+    return {
+        "nep_year": nep_year,
+        "nep_month": nep_month,
+        "nep_month_name": NEPALI_MONTH_NAMES[nep_month],
+        "nep_month_name_ne": NEPALI_MONTH_NAMES_NE[nep_month],
+        "greg_months_spanning": greg_month_str,
+        "weeks": weeks
+    }
+
+
+def get_calendar_month(year, month, lat=27.7172, lon=85.3240, elevation=1400, tz_name="Asia/Kathmandu"):
+    """Get calendar data for the entire month with tithi and panchanga info for each day"""
+    import calendar
+    
+    cal_matrix = calendar.monthcalendar(year, month)
+    calendar_data = {
+        "year": year,
+        "month": month,
+        "month_name": GREG_TO_NEP_MONTH.get(month, "Unknown"),
+        "weeks": []
+    }
+    
+    for week in cal_matrix:
+        week_data = []
+        for day in week:
+            if day == 0:
+                week_data.append(None)
+            else:
+                date_str = f"{year:04d}-{month:02d}-{day:02d}"
+                try:
+                    panchanga = calculate_panchanga(date_str, lat, lon, elevation, tz_name)
+                    nep_year, nep_month, nep_day = gregorian_to_nepali(datetime(year, month, day))
+                    
+                    primary_tithi = panchanga["tithis"][0] if panchanga["tithis"] else {}
+                    
+                    day_data = {
+                        "greg_date": date_str,
+                        "greg_day": day,
+                        "nep_date": f"{nep_year}-{nep_month}-{nep_day}",
+                        "nep_day": nep_day,
+                        "tithi": primary_tithi.get("name", ""),
+                        "tithi_ne": primary_tithi.get("name_ne", ""),
+                        "paksha": primary_tithi.get("paksha", ""),
+                        "paksha_ne": primary_tithi.get("paksha_ne", ""),
+                        "panchanga": panchanga
+                    }
+                    week_data.append(day_data)
+                except Exception as e:
+                    week_data.append({"greg_day": day, "error": str(e)})
+        
+        calendar_data["weeks"].append(week_data)
+    
+    return calendar_data
+
 
 def calculate_panchanga(date_str, lat=27.7172, lon=85.3240, elevation=1400, tz_name="Asia/Kathmandu"):
     tz = pytz.timezone(tz_name)
@@ -179,48 +418,40 @@ def calculate_panchanga(date_str, lat=27.7172, lon=85.3240, elevation=1400, tz_n
     ds_utc = day_start.astimezone(pytz.utc).replace(tzinfo=None)
     de_utc = day_end.astimezone(pytz.utc).replace(tzinfo=None)
 
-    def vfn_tithi(dt):
-        s, m = get_sidereal_longitudes(dt); return int(normalize_longitude(m - s) / 12)
-    def vfn_nak(dt):
-        _, m = get_sidereal_longitudes(dt); return int(m / (360 / 27))
-    def vfn_yoga(dt):
-        s, m = get_sidereal_longitudes(dt); return int(normalize_longitude(s + m) / (360 / 27))
-    def vfn_karana(dt):
-        s, m = get_sidereal_longitudes(dt); return int(normalize_longitude(m - s) / 6)
+    obs = get_observer(lat, lon, elevation)
 
-    def ifn_tithi(v): return get_tithi_info(v * 12 + 1, 0) # Dummy s_lon for info
-    def ifn_nak(v): return {"number": v+1, "name": NAKSHATRA_NAMES[v % 27]}
-    def ifn_yoga(v): return {"number": v+1, "name": YOGA_NAMES[v % 27]}
-    def ifn_karana(v):
-        if v == 0: k_idx = 10 # Kimstughna
-        elif v >= 57: k_idx = v - 50 # Shakuni, Chatushpada, Naga
-        else: k_idx = (v - 1) % 7
-        return {"number": v, "name": KARANA_NAMES[k_idx], "name_ne": KARANA_NAMES_NEPALI[k_idx]}
+    def vfn_tithi(o, dt):
+        s, m = get_longitudes(o, dt); return tithi_index(s, m)
+    def vfn_nak(o, dt):
+        _, m = get_longitudes(o, dt); return nakshatra_index(m)
+    def vfn_yoga(o, dt):
+        s, m = get_longitudes(o, dt); return yoga_index(s, m)
+    def vfn_karana(o, dt):
+        s, m = get_longitudes(o, dt); return karana_index(tithi_raw(s, m))
 
-    def format_t(raw, tz):
-        out = []
-        for t in raw:
-            s_loc = pytz.utc.localize(t["start_utc"]).astimezone(tz)
-            e_loc = pytz.utc.localize(t["end_utc"]).astimezone(tz) if t["end_utc"] else None
-            out.append({**t["info"], "start": s_loc.strftime("%H:%M:%S"), "end": e_loc.strftime("%H:%M:%S") if e_loc else "→ next day"})
-        return out
+    def ifn_tithi(v): return get_tithi_info(v)
+    def ifn_nak(v): return {"number": v, "name": NAKSHATRA_NAMES[(v-1) % 27]}
+    def ifn_yoga(v): return {"number": v, "name": YOGA_NAMES[(v-1) % 27]}
+    def ifn_karana(v): return {"number": v, "name": KARANA_NAMES[v % len(KARANA_NAMES)], "name_ne": KARANA_NAMES_NEPALI[v % len(KARANA_NAMES_NEPALI)]}
 
-    tithis = format_t(scan_day(ds_utc, de_utc, vfn_tithi, ifn_tithi), tz)
-    naks = format_t(scan_day(ds_utc, de_utc, vfn_nak, ifn_nak), tz)
-    yogas = format_t(scan_day(ds_utc, de_utc, vfn_yoga, ifn_yoga), tz)
-    karanas = format_t(scan_day(ds_utc, de_utc, vfn_karana, ifn_karana), tz)
+    prev_tithi_val = vfn_tithi(obs, ds_utc - timedelta(seconds=1))
+    tithis = format_transitions(
+        scan_day(obs, ds_utc, de_utc, vfn_tithi, ifn_tithi),
+        tz,
+        day_start,
+        ds_utc,
+        prev_day_val=prev_tithi_val,
+    )
+    naks = format_transitions(scan_day(obs, ds_utc, de_utc, vfn_nak, ifn_nak), tz, day_start)
+    yogas = format_transitions(scan_day(obs, ds_utc, de_utc, vfn_yoga, ifn_yoga), tz, day_start)
+    karanas = format_transitions(scan_day(obs, ds_utc, de_utc, vfn_karana, ifn_karana), tz, day_start)
 
-    import ephem
-    obs = ephem.Observer(); obs.lat, obs.lon, obs.elevation = str(lat), str(lon), elevation
     obs.date = ds_utc.strftime('%Y/%m/%d %H:%M:%S')
     sunrise = pytz.utc.localize(obs.next_rising(ephem.Sun()).datetime()).astimezone(tz)
     sunset = pytz.utc.localize(obs.next_setting(ephem.Sun()).datetime()).astimezone(tz)
 
-    n_year, n_month, n_day = gregorian_to_nepali(datetime(y, m, d))
-
     return {
         "date": date_str,
-        "nepali_date": f"{n_year}-{n_month}-{n_day}",
         "nepali_month": GREG_TO_NEP_MONTH[m],
         "location": {"lat": lat, "lon": lon, "elevation": elevation, "timezone": tz_name},
         "sunrise": sunrise.strftime("%H:%M:%S"),
@@ -231,67 +462,185 @@ def calculate_panchanga(date_str, lat=27.7172, lon=85.3240, elevation=1400, tz_n
         "karanas": karanas,
     }
 
+
+def print_panchanga(p):
+    W = 58
+    sep = "─" * W
+    print(f"\n{'═'*W}")
+    print(f"  🕉  PANCHANGA  |  {p['date']}  |  {p['location']['timezone']}")
+    print(f"{'═'*W}")
+    print(f"  📍 {p['location']['lat']}°N  {p['location']['lon']}°E  |  elev {p['location']['elevation']}m")
+    print(f"  🌅 Sunrise : {p['sunrise']}     🌇 Sunset : {p['sunset']}")
+    print(sep)
+
+    def show(label, items, name_key="name", extra_key=None):
+        print(f"  {label}")
+        for t in items:
+            line = f"     {t[name_key]}"
+            if extra_key and extra_key in t:
+                line += f"  ({t[extra_key]})"
+            if "paksha" in t:
+                line = f"     {p['nepali_month']} {t['paksha']} {t[name_key]}  ({t.get('name_ne','')})"
+            if t.get('continued'):
+                line += "  (continues from previous day)"
+            print(line)
+            print(f"       {t['start']}  →  {t['end']}")
+        print(sep)
+
+    show("📅 TITHI", p["tithis"])
+    show("🌙 NAKSHATRA", p["nakshatras"])
+    show("☀  YOGA", p["yogas"])
+    show("🔮 KARANA", p["karanas"], extra_key="name_ne")
+
+    if len(p["tithis"]) > 1:
+        print(f"  ⚠️  KSHAYA TITHI: {len(p['tithis'])} tithis transition today!")
+    print(f"{'═'*W}\n")
+
+
+def find_muhurta(date_str, lat=27.7172, lon=85.3240):
+    p = calculate_panchanga(date_str, lat, lon)
+    windows = []
+    for t in p["tithis"]:
+        if t.get("within_paksha") not in AUSPICIOUS_TITHIS_WITHIN_PAKSHA:
+            continue
+        for n in p["nakshatras"]:
+            if n["name"] not in AUSPICIOUS_NAKSHATRAS:
+                continue
+            for y in p["yogas"]:
+                if y["name"] in INAUSPICIOUS_YOGAS:
+                    continue
+                for k in p["karanas"]:
+                    if k["name"] in INAUSPICIOUS_KARANAS:
+                        continue
+                    windows.append({
+                        "tithi": f"{t['paksha']} {t['name']}",
+                        "nakshatra": n["name"],
+                        "yoga": y["name"],
+                        "karana": k["name"],
+                        "window": f"{t['start']}–{t['end']}",
+                    })
+    return windows
+
+
 app = FastAPI()
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
-async def read_root(): return FileResponse("static/index.html")
+async def read_root():
+    return FileResponse("static/index.html")
 
 @app.get("/panchanga/{date_str}")
-async def get_panchanga(date_str: str, lat: float = 27.7172, lon: float = 85.3240):
-    try: return calculate_panchanga(date_str, lat, lon)
-    except Exception as e: return {"error": str(e)}
+async def get_panchanga(date_str: str):
+    try:
+        p = calculate_panchanga(date_str)
+        return p
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/calendar/{year}/{month}")
+async def get_calendar(year: int, month: int):
+    try:
+        cal_data = get_calendar_month(year, month)
+        return cal_data
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.get("/nepali-calendar/{year}/{month}")
-async def get_nepali_calendar(year: int, month: int, lat: float = 27.7172, lon: float = 85.3240):
+async def get_nepali_calendar(year: int, month: int):
     try:
-        month_days = NEPALI_MONTH_DAYS.get(year, [30]*12)[month-1]
-        g_year = year - 57
-        start_month_map = {5:(4,14), 6:(5,15), 7:(6,16), 8:(7,17), 9:(8,17), 10:(9,17), 11:(10,18), 12:(11,17), 1:(12,16), 2:(1,15), 3:(2,13), 4:(3,15)}
-        gm, gd = start_month_map[month]
-        if month < 5 and month != 1: g_year += 1
-        
-        start_date = datetime(g_year, gm, gd)
-        weeks = []
-        current_week = [None] * ((start_date.weekday() + 1) % 7)
-        
-        for day in range(1, month_days + 1):
-            g_date = start_date + timedelta(days=day - 1)
-            p = calculate_panchanga(g_date.strftime("%Y-%m-%d"), lat, lon)
-            current_week.append({
-                "greg_date": g_date.strftime("%Y-%m-%d"),
-                "greg_day": g_date.day,
-                "nep_day": day,
-                "tithi_ne": p["tithis"][0]["name_ne"],
-                "paksha_ne": p["tithis"][0]["paksha_ne"],
-                "panchanga": p
-            })
-            if len(current_week) == 7:
-                weeks.append(current_week); current_week = []
-        if current_week: current_week.extend([None] * (7 - len(current_week))); weeks.append(current_week)
-        
-        return {
-            "nep_year": year, "nep_month": month, "nep_month_name_ne": NEPALI_MONTH_NAMES_NE[month],
-            "greg_months_spanning": f"{start_date.strftime('%B')} / {(start_date + timedelta(days=month_days)).strftime('%B')}",
-            "weeks": weeks
-        }
-    except Exception as e: return {"error": str(e)}
+        cal_data = get_nepali_calendar_month(year, month)
+        return cal_data
+    except Exception as e:
+        return {"error": str(e)}
+
 
 class KundaliRequest(BaseModel):
-    birth_date: str; birth_time: str; latitude: float; longitude: float; timezone: str = "Asia/Kathmandu"
+    birth_date: str
+    birth_time: str
+    latitude: float = 27.7172
+    longitude: float = 85.3240
+    timezone: str = "Asia/Kathmandu"
+
 
 @app.post("/kundali")
 async def generate_kundali(request: KundaliRequest):
+    """Generate Janma Kundali"""
     try:
-        dt = datetime.fromisoformat(f"{request.birth_date}T{request.birth_time}")
-        data = calculate_kundali(dt, request.latitude, request.longitude, request.timezone)
-        ts = request.birth_time.replace(':', '-')
-        j_file, n_file = f"kj_{request.birth_date}_{ts}.svg", f"kn_{request.birth_date}_{ts}.svg"
-        generate_kundali_chart(data, os.path.join("static", j_file), False)
-        generate_kundali_chart(data, os.path.join("static", n_file), True)
-        return {"kundali_data": data, "janma_chart_url": f"/static/{j_file}", "navamsha_chart_url": f"/static/{n_file}"}
-    except Exception as e: raise HTTPException(status_code=400, detail=str(e))
+        # Parse birth datetime
+        birth_datetime = datetime.fromisoformat(f"{request.birth_date}T{request.birth_time}")
+
+        # Calculate kundali
+        kundali_data = calculate_kundali(
+            birth_datetime,
+            request.latitude,
+            request.longitude,
+            request.timezone,
+        )
+
+        # Generate charts
+        timestamp = request.birth_time.replace(':', '-')
+        janma_filename = f"kundali_janma_{request.birth_date}_{timestamp}.svg"
+        nav_filename = f"kundali_navamsha_{request.birth_date}_{timestamp}.svg"
+        
+        janma_path = os.path.join("static", janma_filename)
+        nav_path = os.path.join("static", nav_filename)
+        
+        generate_kundali_chart(kundali_data, janma_path, is_navamsha=False)
+        generate_kundali_chart(kundali_data, nav_path, is_navamsha=True)
+
+        return {
+            "kundali_data": kundali_data,
+            "janma_chart_url": f"/static/{janma_filename}",
+            "navamsha_chart_url": f"/static/{nav_filename}",
+        }
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/kundali-chart/{filename}")
+async def get_kundali_chart(filename: str):
+    """Serve kundali chart SVG"""
+    file_path = os.path.join("static", filename)
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="image/svg+xml")
+    return {"error": "Chart not found"}
+
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    print("Calculating... (takes ~30s for precision scan)\n")
+
+    p = calculate_panchanga("2026-04-15", 27.7172, 85.3240, 1400, "Asia/Kathmandu")
+    print_panchanga(p)
+
+    print("📍 Same date — New York:")
+    p2 = calculate_panchanga("2026-04-15", 40.7128, -74.0060, 10, "America/New_York")
+    print_panchanga(p2)
+
+    print("🔮 Muhurta windows (Kathmandu):")
+    mw = find_muhurta("2026-04-15")
+    if mw:
+        for m in mw[:3]:
+            print(f"  ✅ {m['tithi']} | {m['nakshatra']} | Yoga: {m['yoga']} | {m['window']}")
+    else:
+        print("  No fully auspicious windows today")
+    print("Calculating... (takes ~30s for precision scan)\n")
+
+    p = calculate_panchanga("2026-04-15", 27.7172, 85.3240, 1400, "Asia/Kathmandu")
+    print_panchanga(p)
+
+    print("📍 Same date — New York:")
+    p2 = calculate_panchanga("2026-04-15", 40.7128, -74.0060, 10, "America/New_York")
+    print_panchanga(p2)
+
+    print("🔮 Muhurta windows (Kathmandu):")
+    mw = find_muhurta("2026-04-15")
+    if mw:
+        for m in mw[:3]:
+            print(f"  ✅ {m['tithi']} | {m['nakshatra']} | Yoga: {m['yoga']} | {m['window']}")
+    else:
+        print("  No fully auspicious windows today")

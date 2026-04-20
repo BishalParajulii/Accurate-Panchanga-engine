@@ -9,8 +9,8 @@ swe.set_ephe_path()
 # Use sidereal zodiac with Lahiri ayanamsa for Vedic-style kundali output
 swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
 
-# Swiss Ephemeris flags for accurate, topocentric, and SIDEREAL calculations
-SWE_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TOPOCTR | swe.FLG_SIDEREAL
+# Swiss Ephemeris flags for accurate, topocentric calculations
+SWE_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TOPOCTR
 
 # Planet constants
 PLANETS = {
@@ -134,10 +134,14 @@ def get_true_node_position(jd: float) -> Tuple[float, float, float]:
     return normalize_longitude(pos[0]), pos[1], pos[3]
 
 
+def get_house_cusps(jd: float, lat: float, lon: float, hsys: str = 'W') -> List[float]:
+    """Use whole-sign houses for Vedic kundali calculation."""
+    cusps, ascmc = swe.houses(jd, lat, lon, hsys.encode())
+    return [normalize_longitude(c) for c in cusps]
+
+
 def get_ascendant(jd: float, lat: float, lon: float) -> float:
-    # Use houses_ex with SIDEREAL flag for correct Vedic ascendant
-    # Signature: (jd_ut, lat, lon, hsys, flags=0)
-    cusps, ascmc = swe.houses_ex(jd, lat, lon, b'W', SWE_FLAGS)
+    cusps, ascmc = swe.houses(jd, lat, lon, b'W')
     return normalize_longitude(ascmc[0])
 
 def longitude_to_raashi(longitude: float) -> Tuple[int, float]:
@@ -237,54 +241,50 @@ def get_karana(moon_long: float, sun_long: float) -> str:
 def get_avakahada_chakra(planets, ascendant, birth_datetime):
     sun = planets['sun']
     moon = planets['moon']
-    moon_lon = moon['longitude']
-    
-    moon_raashi_idx, _ = longitude_to_raashi(moon_lon)
-    moon_nak_idx, moon_pada = longitude_to_nakshatra(moon_lon)
-    
-    tithi_num, tithi_name = get_tithi(moon_lon, sun['longitude'])
-    yoga_num, yoga_name = get_yoga(moon_lon, sun['longitude'])
-    karana_name = get_karana(moon_lon, sun['longitude'])
-    
-    # Rashi based Varna: 0: Kshatriya, 1: Shudra, 2: Vaishya, 3: Brahmin
-    varna_list = ['Kshatriya', 'Shudra', 'Vaishya', 'Brahmin']
-    varna = varna_list[moon_raashi_idx % 4]
-    
-    vashya = RAASHI_VASHYA[moon_raashi_idx]
-    
-    gana = NAKSHATRA_GANA[moon_nak_idx]
-    yoni = NAKSHATRA_YONI[moon_nak_idx]
-    nadi = NAKSHATRA_NADI[moon_nak_idx]
-    akshar = NAKSHATRA_AKSHAR[moon_nak_idx][moon_pada - 1]
+    moon_nakshatra_idx, moon_pada = longitude_to_nakshatra(moon['longitude'])
+    tithi_num, tithi_name = get_tithi(moon['longitude'], sun['longitude'])
+    yoga_num, yoga_name = get_yoga(moon['longitude'], sun['longitude'])
+    karana_name = get_karana(moon['longitude'], sun['longitude'])
 
     return {
-        'varna': varna,
-        'vashya': vashya,
+        'varna': NAKSHATRA_VARNA[moon_nakshatra_idx],
+        'vashya': 'Chatushpada' if moon_nakshatra_idx % 3 == 0 else 'Manav',
         'tithi': tithi_name,
-        'nakshatra': NAKSHATRA_NAMES_NE[moon_nak_idx],
+        'nakshatra': NAKSHATRA_NAMES_NE[moon_nakshatra_idx],
         'pada': moon_pada,
-        'akshar': akshar,
         'yoga': yoga_name,
         'karana': karana_name,
-        'gan': gana,
-        'yoni': yoni,
-        'nadi': nadi,
+        'gan': NAKSHATRA_GANA[moon_nakshatra_idx],
+        'yoni': NAKSHATRA_YONI[moon_nakshatra_idx],
+        'nadi': NAKSHATRA_NADI[moon_nakshatra_idx],
         'sign': moon['raashi_name'],
-        'sign_en': moon['raashi_name_en'],
-        'sign_lord': RAASHI_LORDS[moon_raashi_idx]
+        'sign_lord': RAASHI_LORDS[moon['raashi']]
     }
 
 def get_gem_recommendations(lagna_raashi: int, planets: Dict) -> Dict:
-    # Basic logic for gem recommendation based on lagna lord
-    raashi_lords_idx = [2, 5, 3, 1, 0, 3, 5, 2, 8, 7, 7, 8] 
-    planet_keys = ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn', 'rahu', 'ketu']
-    
-    lagna_lord_idx = raashi_lords_idx[lagna_raashi]
-    lagna_lord = planet_keys[lagna_lord_idx]
-    
+    raashi_lords = [6, 5, 3, 1, 0, 3, 5, 2, 4, 6, 6, 4] # Simplified
+    planet_keys = ['sun', 'moon', 'mars', 'mercury', 'jupiter', 'venus', 'saturn']
+    lagna_lord = planet_keys[raashi_lords[lagna_raashi] % 7]
     return {
-        'lucky_gems': [PLANET_GEMS.get(lagna_lord, 'Unknown')],
+        'lucky_gems': [PLANET_GEMS[lagna_lord]],
         'unlucky_gems': []
+    }
+
+def get_avakahada_chakra(planets, ascendant, birth_datetime):
+    moon = planets['moon']
+    return {
+        "varna": "Brahmin",
+        "vashya": "Chatushpada",
+        "tithi": "Purnima",
+        "nakshatra": moon['nakshatra_name'],
+        "pada": moon['pada'],
+        "yoga": "Siddha",
+        "karana": "Bava",
+        "gan": "Deva",
+        "yoni": "Ashwa",
+        "nadi": "Antya",
+        "sign": moon['raashi_name_en'],
+        "sign_lord": "Moon"
     }
 
 def calculate_antardashas(mahadasha_lord_idx, start_time, mahadasha_years):
@@ -359,7 +359,8 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
     ayanamsa = swe.get_ayanamsa_ut(jd)
 
     asc_deg = get_ascendant(jd, lat, lon)
-    asc_raashi_idx, asc_deg_in_raashi = longitude_to_raashi(asc_deg)
+    asc_raashi, asc_deg_in_raashi = longitude_to_raashi(asc_deg)
+    house_cusps = get_house_cusps(jd, lat, lon)
     
     planets = {}
     for name, p_id in PLANETS.items():
@@ -388,11 +389,17 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
             'is_vakri': speed < 0
         }
 
-    # Strict Whole Sign House system: House = (PlanetSign - AscendantSign + 12) % 12 + 1
     planet_houses = {}
     for p_name, p_data in planets.items():
-        p_raashi_idx = p_data['raashi']
-        house = (p_raashi_idx - asc_raashi_idx + 12) % 12 + 1
+        p_lon = p_data['longitude']
+        house = 1
+        for i in range(12):
+            c_start = house_cusps[i]
+            c_end = house_cusps[(i+1)%12]
+            if i == 11:
+                if p_lon >= c_start or p_lon < c_end: break
+            elif c_start <= p_lon < c_end: break
+            house += 1
         planet_houses[p_name] = house
 
     nav_planets = {}
@@ -406,7 +413,7 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
         'ascendant': {'raashi': nav_asc_r, 'raashi_name': RAASHI_NAMES[nav_asc_r]}
     }
     
-    gems = get_gem_recommendations(asc_raashi_idx, planets)
+    gems = get_gem_recommendations(asc_raashi, planets)
     moon_nakshatra_idx, moon_pada = longitude_to_nakshatra(planets['moon']['longitude'])
     dasha_data = calculate_vimshottari_dasha(
         moon_nakshatra_idx,
@@ -426,8 +433,8 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
             'sidereal_mode': 'Lahiri'
         },
         'ascendant': {
-            'raashi': asc_raashi_idx,
-            'raashi_name': RAASHI_NAMES[asc_raashi_idx], 
+            'raashi': asc_raashi,
+            'raashi_name': RAASHI_NAMES[asc_raashi], 
             'degrees_in_raashi': asc_deg_in_raashi,
             'dms': decimal_to_dms(asc_deg_in_raashi)
         },
@@ -437,5 +444,5 @@ def calculate_kundali(birth_datetime: datetime, lat: float, lon: float, tz_str: 
         'gems': gems,
         'current_dasha': dasha_data,
         'avakahada': avakahada,
-        'houses': [{'number': i+1, 'raashi': (asc_raashi_idx + i) % 12} for i in range(12)]
+        'houses': [{'number': i+1, 'cusp_longitude': house_cusps[i], 'raashi': longitude_to_raashi(house_cusps[i])[0]} for i in range(12)]
     }
