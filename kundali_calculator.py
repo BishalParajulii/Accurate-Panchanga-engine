@@ -216,6 +216,15 @@ RAASHI_VASHYA = [
     'Manav', 'Keeta', 'Manav', 'Chatuspada', 'Manav', 'Jalachara'
 ]
 
+# Varna by Nakshatra: 0: Brahmin, 1: Kshatriya, 2: Vaishya, 3: Shudra
+NAKSHATRA_VARNA = [
+    'Shudra', 'Shudra', 'Brahmin', 'Vaishya', 'Vaishya', 'Shudra',
+    'Vaishya', 'Brahmin', 'Shudra', 'Shudra', 'Vaishya', 'Vaishya',
+    'Brahmin', 'Shudra', 'Vaishya', 'Shudra', 'Vaishya', 'Shudra',
+    'Shudra', 'Vaishya', 'Vaishya', 'Brahmin', 'Shudra', 'Shudra',
+    'Vaishya', 'Vaishya', 'Brahmin'
+]
+
 def get_tithi(moon_long: float, sun_long: float) -> Tuple[int, str]:
     diff = normalize_longitude(moon_long - sun_long)
     tithi = int(diff / 12) + 1
@@ -248,7 +257,7 @@ def get_avakahada_chakra(planets, ascendant, birth_datetime):
 
     return {
         'varna': NAKSHATRA_VARNA[moon_nakshatra_idx],
-        'vashya': 'Chatushpada' if moon_nakshatra_idx % 3 == 0 else 'Manav',
+        'vashya': RAASHI_VASHYA[moon['raashi']],
         'tithi': tithi_name,
         'nakshatra': NAKSHATRA_NAMES_NE[moon_nakshatra_idx],
         'pada': moon_pada,
@@ -268,23 +277,6 @@ def get_gem_recommendations(lagna_raashi: int, planets: Dict) -> Dict:
     return {
         'lucky_gems': [PLANET_GEMS[lagna_lord]],
         'unlucky_gems': []
-    }
-
-def get_avakahada_chakra(planets, ascendant, birth_datetime):
-    moon = planets['moon']
-    return {
-        "varna": "Brahmin",
-        "vashya": "Chatushpada",
-        "tithi": "Purnima",
-        "nakshatra": moon['nakshatra_name'],
-        "pada": moon['pada'],
-        "yoga": "Siddha",
-        "karana": "Bava",
-        "gan": "Deva",
-        "yoni": "Ashwa",
-        "nadi": "Antya",
-        "sign": moon['raashi_name_en'],
-        "sign_lord": "Moon"
     }
 
 def calculate_antardashas(mahadasha_lord_idx, start_time, mahadasha_years):
